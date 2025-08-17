@@ -112,6 +112,30 @@ userSchema.methods.comparePassword = async function (candidate) {
 
 const User = mongoose.model('User', userSchema);
 
+// Activity model (user activity / "shakes")
+const activitySchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    type: { type: String, required: true, trim: true },
+    details: { type: mongoose.Schema.Types.Mixed },
+  },
+  { timestamps: true }
+);
+activitySchema.index({ createdAt: -1 });
+const Activity = mongoose.model('Activity', activitySchema);
+
+// Feedback model
+const feedbackSchema = new mongoose.Schema(
+  {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    message: { type: String, required: true, trim: true },
+    rating: { type: Number, min: 1, max: 5 },
+  },
+  { timestamps: true }
+);
+feedbackSchema.index({ createdAt: -1 });
+const Feedback = mongoose.model('Feedback', feedbackSchema);
+
 // Helpers
 function signToken(user) {
   return jwt.sign({ id: user._id.toString(), role: user.role }, JWT_SECRET, {
@@ -223,6 +247,61 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
     return res.status(500).json({ message: 'Internal server error' });
   }
 });
+
+// User activity routes (non-admin)
+app.post('/api/activity/login', authenticate, async (req, res) => {
+  try {
+    await Activity.create({ user: req.user.id, type: 'login', details: req.body || {} });
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+app.post(
+  '/api/activity',
+  authenticate,
+  [body('type').trim().notEmpty().withMessage('type is required')],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const { type, details } = req.body;
+      const doc = await Activity.create({ user: req.user.id, type, details });
+      return res.status(201).json({ id: doc._id, type: doc.type, details: doc.details, createdAt: doc.createdAt });
+    } catch (err) {
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
+app.get(
+  '/api/activity',
+  authenticate,
+  [
+    query('page').optional().isInt({ min: 1 }).toInt(),
+    query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+    query('type').optional().isString().trim(),
+  ],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const page = req.query.page || 1;
+      const limit = req.query.limit || 10;
+      const type = req.query.type || '';
+      const filter = { user: req.user.id };
+      if (type) filter.type = type;
+      const total = await Activity.countDocuments(filter);
+      const data = await Activity.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean();
+      return res.json({ data, page, limit, total, totalPages: Math.ceil(total / limit) });
+    } catch (err) {
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
 
 // Admin routes
 const adminRouter = express.Router();
@@ -384,6 +463,87 @@ adminRouter.delete(
       return res.json({ success: true });
     } catch (err) {
       console.error('delete user error:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
+// Admin: activities (shakes) list
+adminRouter.get(
+  '/shakes',
+  [
+    query('page').optional().isInt({ min: 1 }).toInt(),
+    query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+    query('search').optional().isString().trim(),
+    query('createdFrom').optional().isISO8601().toDate(),
+    query('createdTo').optional().isISO8601().toDate(),
+    query('type').optional().isString().trim(),
+  ],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const page = req.query.page || 1;
+      const limit = req.query.limit || 20;
+      const search = req.query.search || '';
+      const type = req.query.type || '';
+      const createdFrom = req.query.createdFrom;
+      const createdTo = req.query.createdTo;
+
+      const filter = {};
+      if (type) filter.type = type;
+      if (createdFrom || createdTo) {
+        filter.createdAt = {};
+        if (createdFrom) filter.createdAt.$gte = new Date(createdFrom);
+        if (createdTo) filter.createdAt.$lte = new Date(createdTo);
+      }
+      // Basic text search on type or details stringified
+      if (search) {
+        filter.$or = [
+          { type: { $regex: search, $options: 'i' } },
+          { details: { $regex: search, $options: 'i' } },
+        ];
+      }
+
+      const total = await Activity.countDocuments(filter);
+      const data = await Activity.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('user', 'name email role')
+        .lean();
+
+      return res.json({ data, page, limit, total, totalPages: Math.ceil(total / limit) });
+    } catch (err) {
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
+// Admin: feedback list
+adminRouter.get(
+  '/feedback',
+  [
+    query('page').optional().isInt({ min: 1 }).toInt(),
+    query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+    query('search').optional().isString().trim(),
+  ],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const page = req.query.page || 1;
+      const limit = req.query.limit || 50;
+      const search = req.query.search || '';
+      const filter = {};
+      if (search) filter.message = { $regex: search, $options: 'i' };
+      const total = await Feedback.countDocuments(filter);
+      const data = await Feedback.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('user', 'name email role')
+        .lean();
+      return res.json({ data, page, limit, total, totalPages: Math.ceil(total / limit) });
+    } catch (err) {
       return res.status(500).json({ message: 'Internal server error' });
     }
   }
