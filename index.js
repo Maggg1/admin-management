@@ -9,8 +9,39 @@ const { body, param, query, validationResult } = require('express-validator');
 
 // App setup
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+// CORS configuration to support Expo and configurable origins
+const allowedOriginsEnv = process.env.ALLOWED_ORIGINS || '';
+const allowedList = allowedOriginsEnv.split(',').map((s) => s.trim()).filter(Boolean);
+function isAllowedOrigin(origin) {
+  // Allow non-browser clients (e.g., React Native on device often sends no Origin)
+  if (!origin) return true;
+  // If ALLOWED_ORIGINS is set, use it strictly
+  if (allowedList.length > 0) return allowedList.includes(origin);
+  // Default permissive dev behavior: allow common Expo/local dev origins
+  try {
+    const u = new URL(origin);
+    const expoPorts = new Set(['19000', '19001', '19002', '19006']);
+    const isLocalHost = (hn) => hn === 'localhost' || hn === '127.0.0.1' || /^192\.(168|0)\./.test(hn) || /^10\./.test(hn);
+    if (isLocalHost(u.hostname) && (expoPorts.has(u.port) || u.port === '3000' || u.port === '5173')) return true; // include CRA/Vite ports too
+  } catch (_) {}
+  // Also allow generic localhost without explicit port
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+  return false;
+}
+const corsOptions = {
+  origin: (origin, cb) => {
+    if (isAllowedOrigin(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  credentials: false,
+  optionsSuccessStatus: 204,
+  maxAge: 86400,
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+app.use(express.json({ limit: '5mb' }));
 app.use(morgan('dev'));
 app.use('/admin', express.static('public/admin'));
 
