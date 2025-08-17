@@ -22,13 +22,24 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 // Connect to MongoDB
-mongoose
-  .connect(MONGO_URI, { dbName: DB_NAME })
-  .then(() => console.log(`MongoDB connected: ${DB_NAME}`))
-  .catch((err) => {
+// Robust connection with retry to prevent container from exiting on boot
+const MONGO_TIMEOUT_MS = Number(process.env.MONGO_TIMEOUT_MS || 8000);
+async function connectWithRetry() {
+  try {
+    await mongoose.connect(MONGO_URI, {
+      dbName: DB_NAME,
+      serverSelectionTimeoutMS: MONGO_TIMEOUT_MS,
+      connectTimeoutMS: MONGO_TIMEOUT_MS,
+      socketTimeoutMS: 20000,
+    });
+    console.log(`MongoDB connected: ${DB_NAME}`);
+  } catch (err) {
     console.error('MongoDB connection error:', err.message);
-    process.exit(1);
-  });
+    // Retry after short delay instead of exiting, so container stays up
+    setTimeout(connectWithRetry, 5000);
+  }
+}
+connectWithRetry();
 
 // User model
 const userSchema = new mongoose.Schema(
@@ -102,6 +113,10 @@ function isAdmin(req, res, next) {
 app.get('/favicon.ico', (req, res) => res.status(204).set('Cache-Control', 'public, max-age=86400').end());
 app.get('/', (req, res) => res.json({ name: 'admin-backend', status: 'ok', endpoints: ['/health', '/api/auth/login', '/api/admin/users'] }));
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/ready', (req, res) => {
+  const ready = mongoose.connection.readyState === 1; // 1 = connected
+  res.status(ready ? 200 : 503).json({ ready, dbState: mongoose.connection.readyState, timestamp: new Date().toISOString() });
+});
 
 // Auth routes
 app.post(
