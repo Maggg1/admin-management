@@ -111,7 +111,7 @@ function isAdmin(req, res, next) {
 
 // Healthcheck
 app.get('/favicon.ico', (req, res) => res.status(204).set('Cache-Control', 'public, max-age=86400').end());
-app.get('/', (req, res) => res.json({ name: 'admin-backend', status: 'ok', endpoints: ['/health', '/api/auth/login', '/api/admin/users'] }));
+app.get('/', (req, res) => res.redirect('/admin/'));
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 app.get('/ready', (req, res) => {
   const ready = mongoose.connection.readyState === 1; // 1 = connected
