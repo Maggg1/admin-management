@@ -2,6 +2,7 @@
 
 const API_BASE = '';
 const STORAGE_KEY = 'admin_backend_token';
+const USER_KEY = 'admin_backend_user';
 
 function $(sel, ctx = document) { return ctx.querySelector(sel); }
 function $all(sel, ctx = document) { return Array.from(ctx.querySelectorAll(sel)); }
@@ -18,13 +19,16 @@ function setAuth(token, user) {
   if (token) localStorage.setItem(STORAGE_KEY, token); else localStorage.removeItem(STORAGE_KEY);
   const status = $('#authUser');
   const logout = $('#btnLogout');
-  if (token && user) {
-    status.textContent = `${user.name} <${user.email}> (${user.role})`;
+  const stored = getStoredUser();
+  const u = user || stored;
+  if (token && u) {
+    status.textContent = `${u.name} <${u.email}> (${u.role})`;
     logout.hidden = false;
   } else {
     status.textContent = '';
     logout.hidden = true;
   }
+  if (user) setStoredUser(user);
 }
 
 function getToken() { return localStorage.getItem(STORAGE_KEY); }
@@ -32,6 +36,27 @@ function getToken() { return localStorage.getItem(STORAGE_KEY); }
 function authHeaders() {
   const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function getStoredUser() { try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null'); } catch { return null; } }
+function setStoredUser(u) { if (u) localStorage.setItem(USER_KEY, JSON.stringify(u)); else localStorage.removeItem(USER_KEY); }
+function decodeJwt(token) { try { const p = token.split('.')[1]; return JSON.parse(atob(p)); } catch { return null; } }
+async function ensureUserLoaded() {
+  const token = getToken();
+  if (!token) return null;
+  let u = getStoredUser();
+  if (u) return u;
+  const payload = decodeJwt(token);
+  if (payload?.id) {
+    try {
+      const res = await api(`/api/admin/users/${payload.id}`);
+      setStoredUser({ id: res._id || res.id, name: res.name, email: res.email, role: res.role, active: res.active });
+      return getStoredUser();
+    } catch (e) {
+      return null;
+    }
+  }
+  return null;
 }
 
 async function api(path, opts = {}) {
@@ -72,14 +97,10 @@ function debounce(fn, ms=300) {
 // Logout
 $('#btnLogout').addEventListener('click', () => {
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(USER_KEY);
   setAuth(null);
-  hide($('#usersSection'));
-  hide($('#feedbackSection'));
-  hide($('#shakesSection'));
-  hide($('#rewardsSection'));
-  $('#dashboardNav').hidden = true;
-  show($('#authSection'));
   toast('Logged out');
+  window.location.href = '/admin/login';
 });
 
 // Auth forms
@@ -430,9 +451,14 @@ async function confirmDialog(text) {
 (async function init() {
   const token = getToken();
   if (token) {
+    const user = await ensureUserLoaded();
+    setAuth(token, user);
     hide($('#authSection'));
     $('#dashboardNav').hidden = false;
     activateSection('usersSection');
     try { await refreshUsers(); } catch (err) { setMsg($('#usersMsg'), err.message, true); toast(err.message, true); }
+  } else {
+    // Not logged in; redirect to login page
+    window.location.href = '/admin/login';
   }
 })();
