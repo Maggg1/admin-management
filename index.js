@@ -54,7 +54,13 @@ const corsOptions = {
   maxAge: 86400,
 };
 app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions));
+// Avoid Express 5 path-to-regexp wildcard issues: handle preflight without a path pattern
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
 app.use(express.json({ limit: '5mb' }));
 app.use(morgan('dev'));
 app.use('/admin', express.static('public/admin'));
