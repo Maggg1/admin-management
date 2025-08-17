@@ -111,7 +111,7 @@ function isAdmin(req, res, next) {
 
 // Healthcheck
 app.get('/favicon.ico', (req, res) => res.status(204).set('Cache-Control', 'public, max-age=86400').end());
-app.get('/', (req, res) => res.redirect('/admin/'));
+app.get('/', (req, res) => res.redirect('/admin/login'));
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 app.get('/ready', (req, res) => {
   const ready = mongoose.connection.readyState === 1; // 1 = connected
@@ -188,6 +188,10 @@ adminRouter.get(
     query('search').optional().isString().trim(),
     query('sort').optional().isIn(['createdAt', 'name', 'email', 'role']).withMessage('Invalid sort field'),
     query('order').optional().isIn(['asc', 'desc']).withMessage('Invalid order'),
+    query('role').optional().isIn(['admin', 'user']).withMessage('Invalid role'),
+    query('active').optional().isBoolean().toBoolean().withMessage('Active must be boolean'),
+    query('createdFrom').optional().isISO8601().toDate().withMessage('createdFrom must be ISO date'),
+    query('createdTo').optional().isISO8601().toDate().withMessage('createdTo must be ISO date'),
   ],
   handleValidation,
   async (req, res) => {
@@ -197,6 +201,10 @@ adminRouter.get(
       const search = req.query.search || '';
       const sortField = req.query.sort || 'createdAt';
       const sortOrder = req.query.order === 'asc' ? 1 : -1;
+      const role = req.query.role;
+      const active = typeof req.query.active !== 'undefined' ? req.query.active : undefined;
+      const createdFrom = req.query.createdFrom;
+      const createdTo = req.query.createdTo;
 
       const filter = {};
       if (search) {
@@ -204,6 +212,13 @@ adminRouter.get(
           { name: { $regex: search, $options: 'i' } },
           { email: { $regex: search, $options: 'i' } },
         ];
+      }
+      if (role) filter.role = role;
+      if (typeof active !== 'undefined') filter.active = active;
+      if (createdFrom || createdTo) {
+        filter.createdAt = {};
+        if (createdFrom) filter.createdAt.$gte = new Date(createdFrom);
+        if (createdTo) filter.createdAt.$lte = new Date(createdTo);
       }
 
       const total = await User.countDocuments(filter);
