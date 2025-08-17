@@ -3,6 +3,10 @@ const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const admin = require('firebase-admin');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const cors = require('cors');
 const morgan = require('morgan');
 const { body, param, query, validationResult } = require('express-validator');
@@ -61,6 +65,42 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://root:local12345@cluste
 const DB_NAME = process.env.DB_NAME || 'admin_backend';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+
+// Firebase Admin initialization (optional)
+const FIREBASE_CREDENTIALS_FILE = process.env.FIREBASE_CREDENTIALS_FILE;
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID;
+const FIREBASE_CLIENT_EMAIL = process.env.FIREBASE_CLIENT_EMAIL;
+let FIREBASE_PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY;
+if (FIREBASE_PRIVATE_KEY && FIREBASE_PRIVATE_KEY.includes('\\n')) {
+  FIREBASE_PRIVATE_KEY = FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
+}
+let firebaseReady = false;
+try {
+  if (!admin.apps.length && FIREBASE_CREDENTIALS_FILE) {
+    const credPath = path.isAbsolute(FIREBASE_CREDENTIALS_FILE)
+      ? FIREBASE_CREDENTIALS_FILE
+      : path.join(process.cwd(), FIREBASE_CREDENTIALS_FILE);
+    let raw = fs.readFileSync(credPath, 'utf8');
+    // Remove code fences if present
+    raw = raw.split(/\r?\n/).filter((line) => !line.trim().startsWith('```')).join('\n');
+    const serviceAccount = JSON.parse(raw);
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    firebaseReady = true;
+    console.log('Firebase Admin initialized from file');
+  } else if (!admin.apps.length && FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: FIREBASE_PROJECT_ID,
+        clientEmail: FIREBASE_CLIENT_EMAIL,
+        privateKey: FIREBASE_PRIVATE_KEY,
+      }),
+    });
+    firebaseReady = true;
+    console.log('Firebase Admin initialized from env');
+  }
+} catch (e) {
+  console.error('Firebase init error:', e && e.message ? e.message : e);
+}
 
 // Connect to MongoDB
 // Robust connection with retry to prevent container from exiting on boot
@@ -153,17 +193,42 @@ function handleValidation(req, res, next) {
 
 // Auth middleware
 async function authenticate(req, res, next) {
-  try {
-    const auth = req.headers.authorization || '';
-    const [scheme, token] = auth.split(' ');
-    if (scheme !== 'Bearer' || !token) return res.status(401).json({ message: 'Unauthorized' });
+  const auth = req.headers.authorization || '';
+  const [scheme, token] = auth.split(' ');
+  if (scheme !== 'Bearer' || !token) return res.status(401).json({ message: 'Unauthorized' });
 
+  // 1) Try local JWT first
+  try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const user = await User.findById(decoded.id).lean();
-    if (!user || !user.active) return res.status(401).json({ message: 'Unauthorized' });
+    if (user && user.active) {
+      req.user = { id: user._id.toString(), role: user.role };
+      return next();
+    }
+  } catch (_) {
+    // fallthrough to Firebase
+  }
+
+  // 2) Try Firebase ID token
+  try {
+    if (!firebaseReady) throw new Error('Firebase not configured');
+    const fb = await admin.auth().verifyIdToken(token);
+    const email = (fb.email || '').toLowerCase();
+    if (!email) return res.status(401).json({ message: 'Unauthorized' });
+
+    let user = await User.findOne({ email }).lean();
+    if (!user) {
+      // Upsert user based on Firebase identity
+      const name = fb.name || email.split('@')[0] || 'firebase_user';
+      const password = crypto.randomBytes(16).toString('hex');
+      const created = new User({ name, email, password, role: 'user', active: true });
+      await created.save();
+      user = created.toObject();
+    }
+    if (!user.active) return res.status(403).json({ message: 'User is disabled' });
 
     req.user = { id: user._id.toString(), role: user.role };
-    next();
+    return next();
   } catch (err) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
@@ -302,6 +367,47 @@ app.get(
     }
   }
 );
+
+// Compatibility aliases for some frontend paths
+app.get('/admin/users/me', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password').lean();
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    return res.json({ id: user._id, name: user.name, email: user.email, role: user.role, active: user.active });
+  } catch (err) {
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+app.get('/admin/activities', authenticate, async (req, res) => {
+  try {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+    const type = (req.query.type || '').toString();
+    const filter = { user: req.user.id };
+    if (type) filter.type = type;
+    const total = await Activity.countDocuments(filter);
+    const data = await Activity.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+    return res.json({ data, page, limit, total, totalPages: Math.ceil(total / limit) });
+  } catch (err) {
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+app.post('/admin/activities', authenticate, async (req, res) => {
+  try {
+    const type = (req.body && req.body.type) || 'login';
+    const details = (req.body && req.body.details) || req.body || {};
+    const doc = await Activity.create({ user: req.user.id, type, details });
+    return res.status(201).json({ id: doc._id, type: doc.type, details: doc.details, createdAt: doc.createdAt });
+  } catch (err) {
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
 
 // Admin routes
 const adminRouter = express.Router();
