@@ -213,6 +213,17 @@ app.post(
   }
 );
 
+// Current user info (no admin role required)
+app.get('/api/auth/me', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password').lean();
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    return res.json({ id: user._id, name: user.name, email: user.email, role: user.role, active: user.active });
+  } catch (err) {
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 // Admin routes
 const adminRouter = express.Router();
 
