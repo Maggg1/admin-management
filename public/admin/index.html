@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Management</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>Admin Management</h1>
+    <div class="auth-status">
+      <span id="authUser"></span>
+      <button id="btnLogout" class="btn btn-secondary" hidden>Logout</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav id="dashboardNav" class="dashnav" hidden>
+      <div class="navtitle">Dashboard</div>
+      <button class="navbtn active" data-target="usersSection">Users</button>
+      <button class="navbtn" data-target="feedbackSection">Feedback</button>
+      <button class="navbtn" data-target="shakesSection">Shakes</button>
+      <button class="navbtn" data-target="rewardsSection">Rewards</button>
+      <div class="navfoot">Tip: Use the left menu to switch sections</div>
+    </nav>
+
+    <main class="container">
+      <section id="authSection" class="card">
+        <h2>Authentication</h2>
+        <div class="tabs">
+          <button class="tab active" data-tab="loginTab">Login</button>
+          <button class="tab" data-tab="registerTab">Register Admin (first admin only)</button>
+        </div>
+        <div id="loginTab" class="tab-content active">
+          <form id="loginForm" class="form-grid">
+            <label>Email<input type="email" id="loginEmail" required /></label>
+            <label>Password<input type="password" id="loginPassword" required /></label>
+            <button type="submit" class="btn btn-primary">Login</button>
+          </form>
+        </div>
+        <div id="registerTab" class="tab-content">
+          <form id="registerForm" class="form-grid">
+            <label>Name<input type="text" id="registerName" required /></label>
+            <label>Email<input type="email" id="registerEmail" required /></label>
+            <label>Password<input type="password" id="registerPassword" minlength="6" required /></label>
+            <button type="submit" class="btn btn-primary">Create First Admin</button>
+          </form>
+          <small>Note: This endpoint only works before any admin exists.</small>
+        </div>
+        <div id="authMsg" class="msg"></div>
+      </section>
+
+      <!-- USERS -->
+      <section id="usersSection" class="card" hidden>
+        <div class="section-head">
+          <h2>Users</h2>
+          <div class="section-actions">
+            <button id="btnShowCreate" class="btn btn-primary">+ New User</button>
+          </div>
+        </div>
+        <div class="toolbar sticky">
+          <input type="search" id="searchInput" placeholder="Search name or email" />
+          <select id="sortField">
+            <option value="createdAt">Sort by Created</option>
+            <option value="name">Sort by Name</option>
+            <option value="email">Sort by Email</option>
+            <option value="role">Sort by Role</option>
+          </select>
+          <select id="sortOrder">
+            <option value="desc">Desc</option>
+            <option value="asc">Asc</option>
+          </select>
+          <select id="limit">
+            <option>5</option>
+            <option selected>10</option>
+            <option>20</option>
+            <option>50</option>
+          </select>
+          <button id="btnRefresh" class="btn">Refresh</button>
+        </div>
+
+        <div class="table-wrap" id="usersTableWrap">
+          <div class="loader" id="usersLoader" hidden><div class="spinner"></div> Loading users…</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Active</th>
+                <th>Created</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="usersTbody">
+              <tr class="muted"><td colspan="6">No users yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <button id="prevPage" class="btn">Prev</button>
+          <span id="pageInfo"></span>
+          <button id="nextPage" class="btn">Next</button>
+        </div>
+
+        <div id="usersMsg" class="msg"></div>
+      </section>
+
+      <!-- FEEDBACK -->
+      <section id="feedbackSection" class="card" hidden>
+        <div class="section-head"><h2>Feedback</h2></div>
+        <div class="toolbar sticky">
+          <input type="search" id="fbSearch" placeholder="Search feedback" />
+          <select id="fbLimit">
+            <option>10</option>
+            <option>20</option>
+            <option selected>50</option>
+          </select>
+          <button id="fbRefresh" class="btn">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <div class="loader" id="fbLoader" hidden><div class="spinner"></div> Loading feedback…</div>
+          <table>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Message</th>
+                <th>Rating</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody id="feedbackTbody">
+              <tr class="muted"><td colspan="4">No feedback to display</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <button id="fbPrev" class="btn">Prev</button>
+          <span id="fbPageInfo"></span>
+          <button id="fbNext" class="btn">Next</button>
+        </div>
+        <div id="feedbackMsg" class="msg"></div>
+      </section>
+
+      <!-- SHAKES -->
+      <section id="shakesSection" class="card" hidden>
+        <div class="section-head"><h2>Shakes Activity / History</h2></div>
+        <div class="toolbar sticky">
+          <input type="search" id="shSearch" placeholder="Search activity" />
+          <select id="shLimit">
+            <option>10</option>
+            <option selected>20</option>
+            <option>50</option>
+          </select>
+          <button id="shRefresh" class="btn">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <div class="loader" id="shLoader" hidden><div class="spinner"></div> Loading activity…</div>
+          <table>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Type</th>
+                <th>Details</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody id="shakesTbody">
+              <tr class="muted"><td colspan="4">No activity to display</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <button id="shPrev" class="btn">Prev</button>
+          <span id="shPageInfo"></span>
+          <button id="shNext" class="btn">Next</button>
+        </div>
+        <div id="shakesMsg" class="msg"></div>
+      </section>
+
+      <!-- REWARDS -->
+      <section id="rewardsSection" class="card" hidden>
+        <div class="section-head">
+          <h2>Rewards</h2>
+          <div class="section-actions">
+            <button id="btnShowCreateReward" class="btn btn-primary">+ New Reward</button>
+            <button id="rwRefresh" class="btn">Refresh</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <div class="loader" id="rwLoader" hidden><div class="spinner"></div> Loading rewards…</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Points</th>
+                <th>Active</th>
+                <th>Created</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="rewardsTbody">
+              <tr class="muted"><td colspan="5">No rewards yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="rewardsMsg" class="msg"></div>
+      </section>
+
+      <!-- DIALOGS -->
+      <dialog id="createDialog">
+        <form method="dialog" id="createForm" class="form-grid">
+          <h3>Create User</h3>
+          <label>Name<input type="text" id="cName" required /></label>
+          <label>Email<input type="email" id="cEmail" required /></label>
+          <label>Password<input type="password" id="cPassword" minlength="6" required /></label>
+          <label>Role
+            <select id="cRole">
+              <option value="user" selected>User</option>
+              <option value="admin">Admin</option>
+            </select>
+          </label>
+          <menu>
+            <button value="cancel" class="btn btn-secondary">Cancel</button>
+            <button value="default" class="btn btn-primary">Create</button>
+          </menu>
+          <div id="createMsg" class="msg"></div>
+        </form>
+      </dialog>
+
+      <dialog id="editDialog">
+        <form method="dialog" id="editForm" class="form-grid">
+          <h3>Edit User</h3>
+          <input type="hidden" id="eId" />
+          <label>Name<input type="text" id="eName" required /></label>
+          <label>Email<input type="email" id="eEmail" required /></label>
+          <label>Password (leave blank to keep)
+            <input type="password" id="ePassword" minlength="6" />
+          </label>
+          <label>Role
+            <select id="eRole">
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+          </label>
+          <label>Active
+            <select id="eActive">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </label>
+          <menu>
+            <button value="cancel" class="btn btn-secondary">Cancel</button>
+            <button value="default" class="btn btn-primary">Save</button>
+          </menu>
+          <div id="editMsg" class="msg"></div>
+        </form>
+      </dialog>
+
+      <dialog id="createRewardDialog">
+        <form method="dialog" id="createRewardForm" class="form-grid">
+          <h3>Create Reward</h3>
+          <label>Title<input type="text" id="rTitle" required /></label>
+          <label>Description<textarea id="rDesc" rows="3"></textarea></label>
+          <label>Points<input type="number" id="rPoints" min="0" value="0" /></label>
+          <label><input type="checkbox" id="rActive" checked /> Active</label>
+          <menu>
+            <button value="cancel" class="btn btn-secondary">Cancel</button>
+            <button value="default" class="btn btn-primary">Create</button>
+          </menu>
+          <div id="createRewardMsg" class="msg"></div>
+        </form>
+      </dialog>
+
+      <dialog id="editRewardDialog">
+        <form method="dialog" id="editRewardForm" class="form-grid">
+          <h3>Edit Reward</h3>
+          <input type="hidden" id="erId" />
+          <label>Title<input type="text" id="erTitle" required /></label>
+          <label>Description<textarea id="erDesc" rows="3"></textarea></label>
+          <label>Points<input type="number" id="erPoints" min="0" value="0" /></label>
+          <label><input type="checkbox" id="erActive" /> Active</label>
+          <menu>
+            <button value="cancel" class="btn btn-secondary">Cancel</button>
+            <button value="default" class="btn btn-primary">Save</button>
+          </menu>
+          <div id="editRewardMsg" class="msg"></div>
+        </form>
+      </dialog>
+
+      <dialog id="confirmDialog">
+        <form method="dialog" class="confirm-form">
+          <p id="confirmText">Are you sure?</p>
+          <menu>
+            <button value="cancel" class="btn btn-secondary">Cancel</button>
+            <button id="confirmOk" value="default" class="btn btn-primary">OK</button>
+          </menu>
+        </form>
+      </dialog>
+
+    </main>
+  </div>
+
+  <div id="toast" class="toast" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>
