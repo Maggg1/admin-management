@@ -50,7 +50,7 @@ const corsOptions = {
   maxAge: 86400,
 };
 app.use(cors(corsOptions));
-app.options('/*', cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
 app.use(morgan('dev'));
 app.use('/admin', express.static('public/admin'));
