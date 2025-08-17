@@ -5,6 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin Management</title>
   <link rel="stylesheet" href="./styles.css" />
+  <style>
+    /* Light mode overrides applied when html has .theme-light */
+    html.theme-light body{background:#f8fafc;color:#0f172a}
+    html.theme-light .topbar{background:#ffffff;border-bottom:1px solid #e2e8f0}
+    html.theme-light .dashnav{background:#ffffff;border-right:1px solid #e5e7eb}
+    html.theme-light .navbtn{background:#f8fafc;color:#0f172a;border-color:#e5e7eb}
+    html.theme-light .navbtn.active{background:#e5e7eb}
+    html.theme-light .card{background:#ffffff;border-color:#e5e7eb}
+    html.theme-light .toolbar.sticky{background:#ffffff;border-bottom-color:#e5e7eb}
+    html.theme-light input, html.theme-light select, html.theme-light button, html.theme-light textarea{background:#ffffff;color:#0f172a;border-color:#e5e7eb}
+    html.theme-light th{background:#f1f5f9;color:#0f172a}
+    html.theme-light th, html.theme-light td{border-bottom-color:#e5e7eb}
+    html.theme-light .table-wrap{border-color:#e5e7eb}
+    html.theme-light .badge{background:#f1f5f9;border-color:#e5e7eb;color:#0f172a}
+    html.theme-light .toast{background:#ffffff;border-color:#e5e7eb;color:#0f172a}
+    html.theme-light .btn-secondary{background:#f8fafc;border-color:#e5e7eb}
+    html.theme-light .muted{color:#64748b}
+    /* Simple switch */
+    .switch{position:relative;display:inline-block;width:46px;height:26px}
+    .switch input{opacity:0;width:0;height:0}
+    .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#334155;transition:.2s;border-radius:999px}
+    .slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;top:3px;background:white;transition:.2s;border-radius:50%}
+    input:checked + .slider{background:#2563eb}
+    input:checked + .slider:before{transform:translateX(20px)}
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -22,11 +47,13 @@
       <button class="navbtn" data-target="feedbackSection">Feedback</button>
       <button class="navbtn" data-target="shakesSection">Shakes</button>
       <button class="navbtn" data-target="rewardsSection">Rewards</button>
-      <div class="navfoot">Tip: Use the left menu to switch sections</div>
+      <button class="navbtn" data-target="settingsSection">Settings</button>
+      <div class="navfoot">Use the left menu to switch sections</div>
     </nav>
 
     <main class="container">
-      <section id="authSection" class="card">
+      <!-- Auth (kept for compatibility with existing JS, but not used when login page is enabled) -->
+      <section id="authSection" class="card" hidden>
         <h2>Authentication</h2>
         <div class="tabs">
           <button class="tab active" data-tab="loginTab">Login</button>
@@ -77,6 +104,19 @@
             <option>20</option>
             <option>50</option>
           </select>
+          <!-- Extended filters -->
+          <select id="filterRole">
+            <option value="">All roles</option>
+            <option value="admin">Admin</option>
+            <option value="user">User</option>
+          </select>
+          <select id="filterActive">
+            <option value="">All statuses</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+          <input type="date" id="createdFrom" />
+          <input type="date" id="createdTo" />
           <button id="btnRefresh" class="btn">Refresh</button>
         </div>
 
@@ -209,6 +249,22 @@
         <div id="rewardsMsg" class="msg"></div>
       </section>
 
+      <!-- SETTINGS -->
+      <section id="settingsSection" class="card" hidden>
+        <div class="section-head"><h2>Settings</h2></div>
+        <div class="form-grid" style="max-width:520px">
+          <div>
+            <label>Theme</label>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span class="muted">Light</span>
+              <label class="switch"><input id="themeToggle" type="checkbox"><span class="slider"></span></label>
+              <span class="muted">Dark</span>
+            </div>
+            <div class="muted">Your preference is saved and applied across the dashboard and login.</div>
+          </div>
+        </div>
+      </section>
+
       <!-- DIALOGS -->
       <dialog id="createDialog">
         <form method="dialog" id="createForm" class="form-grid">
@@ -306,5 +362,88 @@
   <div id="toast" class="toast" aria-live="polite" aria-atomic="true"></div>
 
   <script src="./app.js" defer></script>
+  <script defer>
+    // Theme persistence and Settings integration
+    (function(){
+      const THEME_KEY = 'admin_theme';
+      const saved = localStorage.getItem(THEME_KEY) || 'light';
+      document.documentElement.classList.toggle('theme-light', saved === 'light');
+      document.documentElement.classList.toggle('theme-dark', saved === 'dark');
+      // Initialize toggle state when Settings section renders
+      document.addEventListener('click', (e)=>{
+        if(e.target && e.target.id === 'themeToggle'){
+          const mode = e.target.checked ? 'dark' : 'light';
+          localStorage.setItem(THEME_KEY, mode);
+          document.documentElement.classList.toggle('theme-light', mode === 'light');
+          document.documentElement.classList.toggle('theme-dark', mode === 'dark');
+        }
+      });
+      // Ensure the toggle reflects saved mode when entering settings
+      const syncToggle = () => {
+        const el = document.getElementById('themeToggle');
+        if(el){ el.checked = (localStorage.getItem(THEME_KEY) || 'light') === 'dark'; }
+      };
+      // Override activateSection to include settingsSection
+      const origActivate = window.activateSection;
+      window.activateSection = function(id){
+        ['usersSection','feedbackSection','shakesSection','rewardsSection','settingsSection'].forEach(sec=>{
+          const node = document.getElementById(sec); if(node) node.hidden = true;
+        });
+        const tgt = document.getElementById(id); if(tgt) tgt.hidden = false;
+        document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.target===id));
+        if(id === 'settingsSection') syncToggle();
+        if(typeof origActivate === 'function' && ['usersSection','feedbackSection','shakesSection','rewardsSection'].includes(id)===false){ /* no-op for others */ }
+      }
+      // Apply toggle state if opened directly
+      document.addEventListener('DOMContentLoaded', syncToggle);
+    })();
+
+    // Extend Users filtering to pass new query params
+    (function(){
+      const $ = (s, c=document)=>c.querySelector(s);
+      const $on = (el, ev, fn)=> el && el.addEventListener(ev, fn);
+      const deb = (fn,ms=350)=>{let t;return (...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}};
+      const ref = window.refreshUsers;
+      if(typeof ref === 'function'){
+        const wrap = async ()=>{
+          // Inject selected filters into the query inputs the original function reads
+          const limit = $('#limit');
+          const search = $('#searchInput');
+          const sortField = $('#sortField');
+          const sortOrder = $('#sortOrder');
+          // We patch fetch URL via monkey patching window.api for this call, but simpler: attach values on DOM and let backend read them via URL params the existing code builds.
+          // The existing refreshUsers builds URLSearchParams from inputs + we added extra inputs handled below by intercepting fetch.
+          // Monkey-patch window.api to append our filters when path starts with /api/admin/users
+          if(!window._apiPatched){
+            const origApi = window.api;
+            window.api = async (path, opts={})=>{
+              if(path && path.startsWith('/api/admin/users')){
+                const url = new URL(path, location.origin);
+                const params = url.searchParams;
+                const fr = $('#filterRole').value; if(fr) params.set('role', fr); else params.delete('role');
+                const fa = $('#filterActive').value; if(fa) params.set('active', fa); else params.delete('active');
+                const cf = $('#createdFrom').value; if(cf) params.set('createdFrom', cf);
+                else params.delete('createdFrom');
+                const ct = $('#createdTo').value; if(ct) params.set('createdTo', ct);
+                else params.delete('createdTo');
+                path = url.pathname + '?' + params.toString();
+              }
+              return origApi(path, opts);
+            };
+            window._apiPatched = true;
+          }
+          return ref();
+        };
+        window.refreshUsers = wrap;
+
+        // Wire filter inputs
+        $on($('#filterRole'),'change',()=>{ window.state.page=1; wrap(); });
+        $on($('#filterActive'),'change',()=>{ window.state.page=1; wrap(); });
+        $on($('#createdFrom'),'change',()=>{ window.state.page=1; wrap(); });
+        $on($('#createdTo'),'change',()=>{ window.state.page=1; wrap(); });
+        $on($('#searchInput'),'input',deb(()=>{ window.state.page=1; wrap(); },350));
+      }
+    })();
+  </script>
 </body>
 </html>
