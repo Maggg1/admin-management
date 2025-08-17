@@ -11,6 +11,11 @@ const { body, param, query, validationResult } = require('express-validator');
 const app = express();
 
 // Early health/readiness endpoints (no CORS restrictions)
+app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/ready', (req, res) => {
+  const ready = mongoose.connection.readyState === 1; // 1 = connected
+  res.status(ready ? 200 : 503).json({ ready, dbState: mongoose.connection.readyState, timestamp: new Date().toISOString() });
+});
 
 // CORS configuration to support Expo and configurable origins
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS || '';
@@ -45,7 +50,7 @@ const corsOptions = {
   maxAge: 86400,
 };
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+app.options('/*', cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
 app.use(morgan('dev'));
 app.use('/admin', express.static('public/admin'));
