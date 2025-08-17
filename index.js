@@ -9,12 +9,17 @@ const { body, param, query, validationResult } = require('express-validator');
 
 // App setup
 const app = express();
+
+// Early health/readiness endpoints (no CORS restrictions)
+
 // CORS configuration to support Expo and configurable origins
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS || '';
 const allowedList = allowedOriginsEnv.split(',').map((s) => s.trim()).filter(Boolean);
 function isAllowedOrigin(origin) {
   // Allow non-browser clients (e.g., React Native on device often sends no Origin)
   if (!origin) return true;
+  // Some environments send literal "null" as origin (e.g., file:// contexts)
+  if (origin === 'null') return true;
   // If ALLOWED_ORIGINS is set, use it strictly
   if (allowedList.length > 0) return allowedList.includes(origin);
   // Default permissive dev behavior: allow common Expo/local dev origins
@@ -143,11 +148,6 @@ function isAdmin(req, res, next) {
 // Healthcheck
 app.get('/favicon.ico', (req, res) => res.status(204).set('Cache-Control', 'public, max-age=86400').end());
 app.get('/', (req, res) => res.redirect('/admin/login'));
-app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
-app.get('/ready', (req, res) => {
-  const ready = mongoose.connection.readyState === 1; // 1 = connected
-  res.status(ready ? 200 : 503).json({ ready, dbState: mongoose.connection.readyState, timestamp: new Date().toISOString() });
-});
 
 // Auth routes
 app.post(
