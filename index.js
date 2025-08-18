@@ -297,6 +297,12 @@ app.post(
 
       const match = await user.comparePassword(password);
       if (!match) return res.status(400).json({ message: 'Invalid credentials' });
+
+      // Ensure only admins can login to the dashboard
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied. Only admins can log in.' });
+      }
+
       if (user.role !== 'admin' && typeof user.emailVerified === 'boolean' && !user.emailVerified) {
         return res.status(403).json({ message: 'Email not verified' });
       }
