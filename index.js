@@ -3,10 +3,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const morgan = require('morgan');
-const path = require('path');
-const fs = require('fs');
-const admin = require('firebase-admin');
-const crypto = require('crypto');
 
 // Import routes
 const adminRoutes = require('./routes/admin');
@@ -131,61 +127,6 @@ app.get('/ready', (req, res) => {
   });
 });
 
-// Firebase Admin initialization with retry
-let firebaseReady = false;
-async function initializeFirebase(retries = 0) {
-  try {
-    if (admin.apps.length > 0) {
-      firebaseReady = true;
-      return;
-    }
-
-    const FIREBASE_CREDENTIALS_FILE = process.env.FIREBASE_CREDENTIALS_FILE;
-    const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID;
-    const FIREBASE_CLIENT_EMAIL = process.env.FIREBASE_CLIENT_EMAIL;
-    let FIREBASE_PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY;
-
-    if (FIREBASE_PRIVATE_KEY && FIREBASE_PRIVATE_KEY.includes('\\n')) {
-      FIREBASE_PRIVATE_KEY = FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n');
-    }
-
-    if (FIREBASE_CREDENTIALS_FILE) {
-      const credPath = path.isAbsolute(FIREBASE_CREDENTIALS_FILE)
-        ? FIREBASE_CREDENTIALS_FILE
-        : path.join(process.cwd(), FIREBASE_CREDENTIALS_FILE);
-      const raw = fs.readFileSync(credPath, 'utf8')
-        .split(/\r?\n/)
-        .filter((line) => !line.trim().startsWith('```'))
-        .join('\n');
-      const serviceAccount = JSON.parse(raw);
-      admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-      console.log('Firebase Admin initialized from file');
-    } else if (FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: FIREBASE_PROJECT_ID,
-          clientEmail: FIREBASE_CLIENT_EMAIL,
-          privateKey: FIREBASE_PRIVATE_KEY,
-        }),
-      });
-      console.log('Firebase Admin initialized from env');
-    }
-
-    firebaseReady = admin.apps.length > 0;
-    if (!firebaseReady) {
-      console.warn('Firebase Admin not configured; proceeding without Firebase auth');
-    }
-  } catch (error) {
-    console.error(`Firebase initialization error (attempt ${retries + 1}):`, error.message);
-    if (retries < MAX_RETRIES) {
-      console.log(`Retrying Firebase initialization in ${RETRY_DELAY}ms...`);
-      setTimeout(() => initializeFirebase(retries + 1), RETRY_DELAY);
-    } else {
-      console.error('Max retries reached for Firebase initialization. Continuing without Firebase.');
-    }
-  }
-}
-
 // MongoDB connection with retry
 async function connectWithRetry(retries = 0) {
   try {
@@ -216,7 +157,7 @@ function signToken(user) {
   });
 }
 
-// Auth middleware
+// Auth middleware (JWT only)
 async function authenticate(req, res, next) {
   const jwt = require('jsonwebtoken');
   const auth = req.headers.authorization || '';
@@ -233,29 +174,8 @@ async function authenticate(req, res, next) {
       req.user = { id: user._id.toString(), role: user.role };
       return next();
     }
+    return res.status(401).json({ message: 'Unauthorized' });
   } catch (_) {
-    // Fall through to Firebase
-  }
-
-  try {
-    if (!firebaseReady || admin.apps.length === 0) throw new Error('Firebase not configured');
-    const fb = await admin.auth().verifyIdToken(token);
-    const email = (fb.email || '').toLowerCase();
-    if (!email) return res.status(401).json({ message: 'Unauthorized' });
-
-    let user = await User.findOne({ email }).lean();
-    if (!user) {
-      const name = fb.name || email.split('@')[0] || 'firebase_user';
-      const password = crypto.randomBytes(16).toString('hex');
-      const created = new User({ name, email, password, role: 'user', active: true });
-      await created.save();
-      user = created.toObject();
-    }
-    if (!user.active) return res.status(403).json({ message: 'User is disabled' });
-
-    req.user = { id: user._id.toString(), role: user.role };
-    return next();
-  } catch (err) {
     return res.status(401).json({ message: 'Unauthorized' });
   }
 }
@@ -465,7 +385,6 @@ function gracefulShutdown(signal) {
 
 // Initialize services
 connectWithRetry();
-initializeFirebase();
 
 // Handle process events
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
