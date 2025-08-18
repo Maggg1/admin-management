@@ -249,14 +249,21 @@ $('#usersTbody').addEventListener('click', async (e) => {
   if (action === 'delete') {
     const confirmed = await confirmDialog('Delete this user?');
     if (!confirmed) return;
-    try {
-      await api(`/api/admin/users/${id}`, { method: 'DELETE' });
-      await refreshUsers();
-      toast('User deleted');
-    } catch (err) {
-      setMsg($('#usersMsg'), err.message, true);
-      toast(err.message, true);
-    }
+      try {
+        await api(`/api/admin/users/${id}`, { method: 'DELETE' });
+        await refreshUsers();
+        toast('User deleted');
+      } catch (err) {
+        let errorMessage = 'Failed to delete user';
+        try {
+          const errorData = JSON.parse(err.message.split(' ').slice(2).join(' '));
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseErr) {
+          errorMessage = err.message || errorMessage;
+        }
+        setMsg($('#usersMsg'), errorMessage, true);
+        toast(errorMessage, true);
+      }
   }
   if (action === 'edit') {
     try {

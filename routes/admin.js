@@ -149,20 +149,34 @@ router.delete(
   async (req, res) => {
     try {
       const toDelete = await User.findById(req.params.id);
-      if (!toDelete) return res.status(404).json({ message: 'User not found' });
+      if (!toDelete) {
+        console.log(`User not found for deletion: ${req.params.id}`);
+        return res.status(404).json({ message: 'User not found' });
+      }
 
       // Prevent deleting the last admin
       if (toDelete.role === 'admin') {
         const adminCount = await User.countDocuments({ role: 'admin' });
         if (adminCount <= 1) {
+          console.log(`Attempted to delete last admin user: ${req.params.id}`);
           return res.status(400).json({ message: 'Cannot delete the last admin user' });
         }
       }
 
-      await toDelete.deleteOne();
-      return res.json({ success: true });
+      // Check if trying to delete self
+      if (toDelete._id.toString() === req.user.id) {
+        console.log(`Attempted to delete self: ${req.params.id}`);
+        return res.status(400).json({ message: 'Cannot delete your own account' });
+      }
+
+      await User.deleteOne({ _id: req.params.id });
+      console.log(`User deleted successfully: ${req.params.id}`);
+      return res.json({ success: true, message: 'User deleted successfully' });
     } catch (err) {
       console.error('delete user error:', err);
+      if (err.name === 'CastError') {
+        return res.status(400).json({ message: 'Invalid user ID format' });
+      }
       return res.status(500).json({ message: 'Internal server error' });
     }
   }
