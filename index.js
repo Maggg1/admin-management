@@ -311,6 +311,40 @@ app.post(
   }
 );
 
+// User registration endpoint for React Expo app
+app.post(
+  '/api/auth/register',
+  [
+    require('express-validator').body('name').trim().notEmpty().withMessage('Name is required'),
+    require('express-validator').body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
+    require('express-validator').body('password').isLength({ min: 6 }).withMessage('Password min length 6'),
+  ],
+  require('./utils/validation'),
+  async (req, res) => {
+    try {
+      const { name, email, password } = req.body;
+      const user = new User({ name, email, password, role: 'user', active: true });
+      await user.save();
+
+      const token = signToken(user);
+      const safeUser = { 
+        id: user._id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role, 
+        active: user.active 
+      };
+      return res.status(201).json({ token, user: safeUser });
+    } catch (err) {
+      if (err?.code === 11000) {
+        return res.status(409).json({ message: 'Email already in use' });
+      }
+      console.error('register error:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
 app.post(
   '/api/auth/login',
   [
