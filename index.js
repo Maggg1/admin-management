@@ -183,6 +183,9 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true, minlength: 6, select: false },
     role: { type: String, enum: ['admin', 'user'], default: 'user', index: true },
     active: { type: Boolean, default: true },
+    emailVerified: { type: Boolean, default: false },
+    emailVerificationToken: { type: String, select: false },
+    emailVerificationExpires: { type: Date, select: false },
   },
   { timestamps: true }
 );
@@ -315,7 +318,7 @@ app.post(
       }
 
       const { name, email, password } = req.body;
-      const user = new User({ name, email, password, role: 'admin' });
+      const user = new User({ name, email, password, role: 'admin', emailVerified: true });
       await user.save();
 
       const token = signToken(user);
@@ -344,6 +347,7 @@ app.post(
 
       const match = await user.comparePassword(password);
       if (!match) return res.status(400).json({ message: 'Invalid credentials' });
+      if (user.role !== 'admin' && !user.emailVerified) return res.status(403).json({ message: 'Email not verified' });
 
       const token = signToken(user);
       const safeUser = { id: user._id, name: user.name, email: user.email, role: user.role, active: user.active };
@@ -361,6 +365,29 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
     const user = await User.findById(req.user.id).select('-password').lean();
     if (!user) return res.status(404).json({ message: 'User not found' });
     return res.json({ id: user._id, name: user.name, email: user.email, role: user.role, active: user.active });
+  } catch (err) {
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Email verification (local auth)
+app.get('/api/auth/verify-email', async (req, res) => {
+  try {
+    const token = (req.query.token || '').toString();
+    if (!token) return res.status(400).json({ message: 'Token is required' });
+    const hashed = crypto.createHash('sha256').update(token).digest('hex');
+    const user = await User.findOne({
+      emailVerificationToken: hashed,
+      emailVerificationExpires: { $gt: new Date() },
+    });
+    if (!user) return res.status(400).json({ message: 'Invalid or expired token' });
+
+    user.emailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+
+    return res.json({ message: 'Email verified successfully' });
   } catch (err) {
     return res.status(500).json({ message: 'Internal server error' });
   }
@@ -437,6 +464,7 @@ app.post(
 
       const match = await user.comparePassword(password);
       if (!match) return res.status(400).json({ message: 'Invalid credentials' });
+      if (user.role !== 'admin' && !user.emailVerified) return res.status(403).json({ message: 'Email not verified' });
 
       const token = signToken(user);
       const safeUser = { id: user._id, name: user.name, email: user.email, role: user.role, active: user.active };
@@ -459,11 +487,21 @@ app.post(
   async (req, res) => {
     try {
       const { name, email, password } = req.body;
-      const user = new User({ name, email, password, role: 'user' });
+      const user = new User({ name, email, password, role: 'user', emailVerified: false });
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const hashed = crypto.createHash('sha256').update(rawToken).digest('hex');
+      user.emailVerificationToken = hashed;
+      user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
       await user.save();
-      const token = signToken(user);
-      const safeUser = { id: user._id, name: user.name, email: user.email, role: user.role, active: user.active };
-      return res.status(201).json({ token, user: safeUser });
+
+      const baseUrl = process.env.PUBLIC_BASE_URL || process.env.BASE_URL || `http://localhost:${PORT}`;
+      const verificationUrl = `${baseUrl}/admin/verify-email.html?token=${rawToken}`;
+      console.log('Email verification link:', verificationUrl);
+
+      return res.status(201).json({
+        message: 'Registration successful. Please verify your email using the link sent to your email.',
+        verificationUrl,
+      });
     } catch (err) {
       if (err && err.code === 11000) {
         return res.status(409).json({ message: 'Email already in use' });
