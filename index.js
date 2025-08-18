@@ -555,6 +555,18 @@ app.post('/admin/activities', authenticate, async (req, res) => {
 // Admin routes
 const adminRouter = express.Router();
 
+// Normalize ':id' param from query/body if path param is missing or 'undefined'/'null'
+adminRouter.use((req, res, next) => {
+  if (req.params && Object.prototype.hasOwnProperty.call(req.params, 'id')) {
+    const pid = req.params.id;
+    if (!pid || pid === 'undefined' || pid === 'null') {
+      const fallback = req.query.id || (req.body && req.body.id);
+      if (fallback) req.params.id = fallback;
+    }
+  }
+  next();
+});
+
 adminRouter.get(
   '/users',
   [
