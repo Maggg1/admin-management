@@ -421,6 +421,30 @@ app.get(
 );
 
 // Compatibility aliases for some frontend paths
+app.post(
+  '/admin/users/login',
+  [body('email').isEmail().withMessage('Valid email required'), body('password').notEmpty().withMessage('Password required')],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      const user = await User.findOne({ email }).select('+password');
+      if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+      if (!user.active) return res.status(403).json({ message: 'User is disabled' });
+
+      const match = await user.comparePassword(password);
+      if (!match) return res.status(400).json({ message: 'Invalid credentials' });
+
+      const token = signToken(user);
+      const safeUser = { id: user._id, name: user.name, email: user.email, role: user.role, active: user.active };
+      return res.json({ token, user: safeUser });
+    } catch (err) {
+      console.error('login error:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
 app.get('/admin/users/me', authenticate, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password').lean();
