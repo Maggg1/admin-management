@@ -247,8 +247,8 @@ app.post(
 );
 
 app.post(
-  '/api/auth/register',
-  authLimiter,
+  ['/api/auth/register', '/admin/api/auth/register'],
+  apiLimiter,
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
