@@ -801,7 +801,40 @@ adminRouter.get(
   }
 );
 
+// Admin delete endpoints for activities (shakes) and feedback
+adminRouter.delete(
+  '/shakes/:id',
+  [param('id').custom((v) => mongoose.Types.ObjectId.isValid(v)).withMessage('Invalid ID')],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const doc = await Activity.findByIdAndDelete(req.params.id);
+      if (!doc) return res.status(404).json({ message: 'Activity not found' });
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
+adminRouter.delete(
+  '/feedback/:id',
+  [param('id').custom((v) => mongoose.Types.ObjectId.isValid(v)).withMessage('Invalid ID')],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const doc = await Feedback.findByIdAndDelete(req.params.id);
+      if (!doc) return res.status(404).json({ message: 'Feedback not found' });
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
+// Mount admin router under both /api/admin and /admin for compatibility
 app.use('/api/admin', authenticate, isAdmin, adminRouter);
+app.use('/admin', authenticate, isAdmin, adminRouter);
 
 // Global error handler (fallback)
 // eslint-disable-next-line no-unused-vars
