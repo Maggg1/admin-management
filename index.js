@@ -832,6 +832,58 @@ adminRouter.delete(
   }
 );
 
+// Alternative DELETE endpoints accepting id via query or body for compatibility
+adminRouter.delete('/users', async (req, res) => {
+  try {
+    const id = req.query.id || (req.body && req.body.id);
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid or missing id' });
+    }
+    const toDelete = await User.findById(id);
+    if (!toDelete) return res.status(404).json({ message: 'User not found' });
+
+    if (toDelete.role === 'admin') {
+      const adminCount = await User.countDocuments({ role: 'admin' });
+      if (adminCount <= 1) {
+        return res.status(400).json({ message: 'Cannot delete the last admin user' });
+      }
+    }
+
+    await toDelete.deleteOne();
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+adminRouter.delete('/shakes', async (req, res) => {
+  try {
+    const id = req.query.id || (req.body && req.body.id);
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid or missing id' });
+    }
+    const doc = await Activity.findByIdAndDelete(id);
+    if (!doc) return res.status(404).json({ message: 'Activity not found' });
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+adminRouter.delete('/feedback', async (req, res) => {
+  try {
+    const id = req.query.id || (req.body && req.body.id);
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid or missing id' });
+    }
+    const doc = await Feedback.findByIdAndDelete(id);
+    if (!doc) return res.status(404).json({ message: 'Feedback not found' });
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 // Mount admin router under both /api/admin and /admin for compatibility
 app.use('/api/admin', authenticate, isAdmin, adminRouter);
 app.use('/admin', authenticate, isAdmin, adminRouter);
