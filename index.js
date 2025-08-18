@@ -719,6 +719,46 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
+});
+
+// Optional: tune timeouts for proxies/load balancers
+try {
+  server.keepAliveTimeout = 65000; // 65s
+  server.headersTimeout = 66000;   // 66s
+} catch (_) {}
+
+function gracefulShutdown(signal) {
+  console.log(`${signal} received: starting graceful shutdown`);
+  // Stop accepting new connections
+  server.close(() => {
+    console.log('HTTP server closed');
+    // Close mongoose connection
+    mongoose.connection.close(false).then(() => {
+      console.log('MongoDB connection closed');
+      process.exit(0);
+    }).catch((err) => {
+      console.error('Error closing MongoDB connection:', err && err.message ? err.message : err);
+      process.exit(0);
+    });
+  });
+
+  // Force exit if not closed in time
+  setTimeout(() => {
+    console.warn('Forcing shutdown after timeout');
+    process.exit(0);
+  }, 10000).unref();
+}
+
+// Handle termination signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Log unexpected errors
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
 });
