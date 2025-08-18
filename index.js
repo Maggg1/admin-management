@@ -171,7 +171,10 @@ async function initializeFirebase(retries = 0) {
       console.log('Firebase Admin initialized from env');
     }
 
-    firebaseReady = true;
+    firebaseReady = admin.apps.length > 0;
+    if (!firebaseReady) {
+      console.warn('Firebase Admin not configured; proceeding without Firebase auth');
+    }
   } catch (error) {
     console.error(`Firebase initialization error (attempt ${retries + 1}):`, error.message);
     if (retries < MAX_RETRIES) {
@@ -235,7 +238,7 @@ async function authenticate(req, res, next) {
   }
 
   try {
-    if (!firebaseReady) throw new Error('Firebase not configured');
+    if (!firebaseReady || admin.apps.length === 0) throw new Error('Firebase not configured');
     const fb = await admin.auth().verifyIdToken(token);
     const email = (fb.email || '').toLowerCase();
     if (!email) return res.status(401).json({ message: 'Unauthorized' });
@@ -361,7 +364,7 @@ app.post(
 
       const match = await user.comparePassword(password);
       if (!match) return res.status(400).json({ message: 'Invalid credentials' });
-      if (user.role !== 'admin' && !user.emailVerified) {
+      if (user.role !== 'admin' && typeof user.emailVerified === 'boolean' && !user.emailVerified) {
         return res.status(403).json({ message: 'Email not verified' });
       }
 
