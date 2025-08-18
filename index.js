@@ -108,6 +108,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 app.use('/admin', express.static('public/admin'));
 
@@ -423,12 +424,14 @@ app.get(
 // Compatibility aliases for some frontend paths
 app.post(
   '/admin/users/login',
-  [body('email').isEmail().withMessage('Valid email required'), body('password').notEmpty().withMessage('Password required')],
+  [body('password').notEmpty().withMessage('Password required')],
   handleValidation,
   async (req, res) => {
     try {
-      const { email, password } = req.body;
-      const user = await User.findOne({ email }).select('+password');
+      const emailRaw = (req.body.email || req.body.username || '').toString().trim().toLowerCase();
+      const password = req.body.password;
+      if (!emailRaw) return res.status(400).json({ message: 'Email required' });
+      const user = await User.findOne({ email: emailRaw }).select('+password');
       if (!user) return res.status(400).json({ message: 'Invalid credentials' });
       if (!user.active) return res.status(403).json({ message: 'User is disabled' });
 
@@ -440,6 +443,32 @@ app.post(
       return res.json({ token, user: safeUser });
     } catch (err) {
       console.error('login error:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
+app.post(
+  '/admin/users/register',
+  [
+    body('name').trim().notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
+    body('password').isLength({ min: 6 }).withMessage('Password min length 6'),
+  ],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const { name, email, password } = req.body;
+      const user = new User({ name, email, password, role: 'user' });
+      await user.save();
+      const token = signToken(user);
+      const safeUser = { id: user._id, name: user.name, email: user.email, role: user.role, active: user.active };
+      return res.status(201).json({ token, user: safeUser });
+    } catch (err) {
+      if (err && err.code === 11000) {
+        return res.status(409).json({ message: 'Email already in use' });
+      }
+      console.error('register user error:', err);
       return res.status(500).json({ message: 'Internal server error' });
     }
   }
