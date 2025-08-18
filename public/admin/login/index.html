@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Login</title>
+  <style>
+    :root{
+      --bg:#f8fafc;--card:#ffffff;--text:#0f172a;--muted:#64748b;--border:#e2e8f0;--primary:#2563eb;--primary-600:#1d4ed8;
+      --input-bg:#ffffff;--error:#b91c1c;--success:#166534;
+    }
+    [data-theme="dark"]{--bg:#0f172a;--card:#111827;--text:#e2e8f0;--muted:#94a3b8;--border:#334155;--primary:#60a5fa;--primary-600:#3b82f6;--input-bg:#0b1220;--error:#fecaca;--success:#a7f3d0}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans",sans-serif;background:var(--bg);color:var(--text);}
+    .wrap{min-height:100vh;display:grid;place-items:center;padding:24px}
+    .card{width:100%;max-width:440px;background:var(--card);border:1px solid var(--border);border-radius:16px;box-shadow:0 10px 24px rgba(0,0,0,.06)}
+    .head{padding:20px 20px 0;display:flex;justify-content:space-between;align-items:center}
+    .brand{display:flex;align-items:center;gap:10px}
+    .logo{width:36px;height:36px;border-radius:10px;background:var(--primary);display:grid;place-items:center;color:white;font-weight:700}
+    .title{margin:0;font-size:18px}
+    .tabs{display:flex;gap:6px;padding:14px 20px 0}
+    .tab{flex:1;padding:10px 12px;background:transparent;border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;color:var(--muted);cursor:pointer}
+    .tab.active{background:var(--card);color:var(--text);border-bottom:1px solid var(--card)}
+    .body{padding:16px 20px 20px;border-top:1px solid var(--border)}
+    .form-grid{display:grid;gap:12px}
+    label{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}
+    input{padding:12px 12px;border-radius:10px;border:1px solid var(--border);background:var(--input-bg);color:var(--text)}
+    input:focus{outline:2px solid var(--primary-600)}
+    .row{display:flex;gap:10px}
+    .row > *{flex:1}
+    .btn{padding:12px;border-radius:10px;border:1px solid var(--border);background:#fff;color:var(--text);cursor:pointer}
+    .btn.primary{background:var(--primary);border-color:var(--primary-600);color:#fff}
+    .btn.secondary{background:#fff}
+    .muted{color:var(--muted);font-size:12px}
+    .msg{min-height:18px;margin-top:6px}
+    .msg.error{color:var(--error)}
+    .msg.success{color:var(--success)}
+    .footer{padding:12px 20px 20px;display:flex;justify-content:space-between;align-items:center}
+    .toggle{display:flex;align-items:center;gap:8px}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="head">
+        <div class="brand">
+          <div class="logo">A</div>
+          <h1 class="title">Admin Console</h1>
+        </div>
+        <div class="toggle">
+          <label for="themeToggle">Dark mode</label>
+          <input id="themeToggle" type="checkbox" />
+        </div>
+      </div>
+      <div class="tabs">
+        <button class="tab active" data-tab="loginTab">Login</button>
+        <button class="tab" data-tab="registerTab">Register Admin</button>
+      </div>
+      <div class="body">
+        <div id="loginTab" class="tab-content" style="display:block">
+          <form id="loginForm" class="form-grid">
+            <label>Email<input type="email" id="loginEmail" autocomplete="username" required /></label>
+            <label>Password<input type="password" id="loginPassword" autocomplete="current-password" required /></label>
+            <button type="submit" class="btn primary">Login</button>
+          </form>
+          <div id="loginMsg" class="msg"></div>
+        </div>
+
+        <div id="registerTab" class="tab-content" style="display:none">
+          <form id="registerForm" class="form-grid">
+            <div class="row">
+              <label>Name<input type="text" id="registerName" required /></label>
+              <label>Email<input type="email" id="registerEmail" required /></label>
+            </div>
+            <label>Password<input type="password" id="registerPassword" minlength="6" required /></label>
+            <button type="submit" class="btn primary">Create First Admin</button>
+          </form>
+          <div class="muted">Note: Register Admin only works when no admin exists.</div>
+          <div id="registerMsg" class="msg"></div>
+        </div>
+      </div>
+      <div class="footer">
+        <span class="muted">After login you will be redirected to the dashboard.</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'admin_backend_token';
+    const THEME_KEY = 'admin_theme';
+    const $ = (s, c=document)=>c.querySelector(s);
+    const $$ = (s, c=document)=>Array.from(c.querySelectorAll(s));
+
+    // Theme init
+    (function(){
+      const saved = localStorage.getItem(THEME_KEY) || 'light';
+      document.documentElement.setAttribute('data-theme', saved);
+      $('#themeToggle').checked = saved === 'dark';
+      $('#themeToggle').addEventListener('change', () => {
+        const mode = $('#themeToggle').checked ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', mode);
+        localStorage.setItem(THEME_KEY, mode);
+      });
+    })();
+
+    // Tabs
+    $$('.tab').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        $$('.tab').forEach(b=>b.classList.remove('active'));
+        $$('.tab-content').forEach(tc=>tc.style.display='none');
+        btn.classList.add('active');
+        $('#'+btn.dataset.tab).style.display='block';
+      });
+    });
+
+    function authHeaders(){
+      const t = localStorage.getItem(STORAGE_KEY);
+      return t?{Authorization:'Bearer '+t}:{ };
+    }
+    async function api(path, opts={}){
+      const headers = { 'Content-Type':'application/json', ...authHeaders(), ...(opts.headers||{}) };
+      const res = await fetch(path, { ...opts, headers });
+      if(!res.ok){ let d=''; try{ d = JSON.stringify(await res.json()); }catch(e){}; throw new Error(res.status+' '+res.statusText+' '+d); }
+      const ct = res.headers.get('content-type')||''; return ct.includes('application/json')?res.json():res.text();
+    }
+
+    // Already logged in? Go to dashboard
+    (function(){ if(localStorage.getItem(STORAGE_KEY)){ location.href='/admin/'; } })();
+
+    $('#loginForm').addEventListener('submit', async (e)=>{
+      e.preventDefault(); $('#loginMsg').textContent='';
+      try{
+        const email = $('#loginEmail').value.trim();
+        const password = $('#loginPassword').value;
+        const { token } = await api('/api/auth/login', { method:'POST', body: JSON.stringify({ email, password }) });
+        localStorage.setItem(STORAGE_KEY, token);
+        location.href = '/admin/';
+      }catch(err){ $('#loginMsg').textContent = err.message; $('#loginMsg').className='msg error'; }
+    });
+
+    $('#registerForm').addEventListener('submit', async (e)=>{
+      e.preventDefault(); $('#registerMsg').textContent='';
+      try{
+        const name = $('#registerName').value.trim();
+        const email = $('#registerEmail').value.trim();
+        const password = $('#registerPassword').value;
+        const { token } = await api('/api/auth/register-admin', { method:'POST', body: JSON.stringify({ name, email, password }) });
+        localStorage.setItem(STORAGE_KEY, token);
+        location.href = '/admin/';
+      }catch(err){ $('#registerMsg').textContent = err.message; $('#registerMsg').className='msg error'; }
+    });
+  </script>
+</body>
+</html>

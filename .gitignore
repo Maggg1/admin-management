@@ -1,0 +1,24 @@
+# Node
+node_modules/
+.nyc_output/
+coverage/
+
+# Env
+.env
+.env.*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local data/secrets
+*.local.json
+*.secret.json
+*service-account*.json
+shakes-915ba-firebase-adminsdk-fbsvc-6ab2c5c9c7.json
