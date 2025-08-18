@@ -24,13 +24,58 @@ app.get('/ready', (req, res) => {
 // CORS configuration to support Expo and configurable origins
 const allowedOriginsEnv = process.env.ALLOWED_ORIGINS || '';
 const allowedList = allowedOriginsEnv.split(',').map((s) => s.trim()).filter(Boolean);
+
+function matchesAllowed(originStr, allowed) {
+  try {
+    const o = new URL(originStr);
+    const oHost = o.hostname.toLowerCase();
+    const oPort = (o.port || '').toLowerCase();
+    const oProto = o.protocol.toLowerCase();
+    const oOrigin = `${oProto}//${oHost}${oPort ? `:${oPort}` : ''}`;
+
+    const a = (allowed || '').trim().toLowerCase();
+    if (!a) return false;
+
+    // Wildcard all
+    if (a === '*') return true;
+
+    // Exact full origin
+    if (a === oOrigin) return true;
+
+    // Host only or host:port
+    if (a === oHost || a === `${oHost}:${oPort}`) return true;
+
+    // Protocol+host(+optional :port)
+    if (/^https?:\/\//.test(a)) {
+      const au = new URL(a);
+      const aHost = au.hostname.toLowerCase();
+      const aPort = (au.port || '').toLowerCase();
+      const aProto = au.protocol.toLowerCase();
+      if (aHost === oHost && aProto === oProto) {
+        if (aPort && aPort !== oPort) return false;
+        return true;
+      }
+    }
+
+    // Wildcard subdomain like *.example.com
+    if (a.startsWith('*.')) {
+      const suffix = a.slice(1); // keep leading dot
+      if (oHost.endsWith(suffix)) return true;
+    }
+
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
 function isAllowedOrigin(origin) {
   // Allow non-browser clients (e.g., React Native on device often sends no Origin)
   if (!origin) return true;
   // Some environments send literal "null" as origin (e.g., file:// contexts)
   if (origin === 'null') return true;
-  // If ALLOWED_ORIGINS is set, use it strictly
-  if (allowedList.length > 0) return allowedList.includes(origin);
+  // If ALLOWED_ORIGINS is set, use it strictly with flexible matching
+  if (allowedList.length > 0) return allowedList.some((a) => matchesAllowed(origin, a));
   // Default permissive dev behavior: allow common Expo/local dev origins
   try {
     const u = new URL(origin);
@@ -45,7 +90,8 @@ function isAllowedOrigin(origin) {
 const corsOptions = {
   origin: (origin, cb) => {
     if (isAllowedOrigin(origin)) return cb(null, true);
-    return cb(new Error('Not allowed by CORS'));
+    // Deny without throwing to avoid 500s; browser will block due to missing CORS headers
+    return cb(null, false);
   },
   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
@@ -608,11 +654,14 @@ adminRouter.get(
         if (createdFrom) filter.createdAt.$gte = new Date(createdFrom);
         if (createdTo) filter.createdAt.$lte = new Date(createdTo);
       }
-      // Basic text search on type or details stringified
+      // Basic text search on type or common string subfields within details.
+      // Avoid applying $regex directly to Mixed/object fields to prevent Mongo errors.
       if (search) {
         filter.$or = [
           { type: { $regex: search, $options: 'i' } },
-          { details: { $regex: search, $options: 'i' } },
+          { 'details.message': { $regex: search, $options: 'i' } },
+          { 'details.text': { $regex: search, $options: 'i' } },
+          { 'details.description': { $regex: search, $options: 'i' } },
         ];
       }
 
