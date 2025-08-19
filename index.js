@@ -343,8 +343,10 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
 
 // Mount admin routes
 app.use('/api/admin', authenticate, isAdmin, adminRoutes);
+app.use('/admin/auth', authRoutes); // Handle /admin/auth/register
+app.use('/admin/users', authRoutes); // Handle /admin/users/register
 
-// Global error handler
+// Centralized error handler
 app.use(errorHandler);
 
 // Start the server
