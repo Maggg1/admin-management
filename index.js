@@ -161,11 +161,11 @@ app.get('/ready', (req, res) => {
 async function connectWithRetry(retries = 0) {
   try {
     await mongoose.connect(MONGO_URI, {
-      dbName: DB_NAME,
-      serverSelectionTimeoutMS: MONGO_TIMEOUT_MS,
-      connectTimeoutMS: MONGO_TIMEOUT_MS,
-      socketTimeoutMS: 20000,
-    });
+    serverSelectionTimeoutMS: MONGO_TIMEOUT_MS,
+    connectTimeoutMS: MONGO_TIMEOUT_MS,
+    socketTimeoutMS: 20000,
+  });
+
     console.log(`MongoDB connected: ${DB_NAME}`);
   } catch (error) {
     console.error(`MongoDB connection error (attempt ${retries + 1}):`, error.message);
