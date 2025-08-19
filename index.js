@@ -14,13 +14,15 @@ const {
   errorHandler,
   authenticate,
   authorize,
+  errorHandler,
+  authLimiter
 } = require('./middleware/security');
 const handleValidation = require('./utils/validation');
 
 // Import routes
-const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
-const activityRoutes = require('./routes/activities');
+const adminRoutes = require('./routes/admin');
+const activitiesRoutes = require('./routes/activities');
 const shakesRoutes = require('./routes/shakes');
 const feedbacksRoutes = require('./routes/feedbacks');
 const usersRoutes = require('./routes/users');
