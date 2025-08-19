@@ -125,7 +125,7 @@ app.use(sanitizeInput);
 app.use(morgan('dev'));
 
 // Global API rate limiting
-app.use('/api', apiLimiter);
+app.use(apiLimiter);
 
 // Static admin client
 app.use('/admin', express.static('public/admin'));
@@ -208,7 +208,7 @@ app.get('/favicon.ico', (req, res) =>
 
 // Auth routes with rate limiting
 app.post(
-  '/api/auth/register-admin',
+  '/auth/register-admin',
   authLimiter,
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
@@ -249,7 +249,7 @@ app.post(
 );
 
 app.post(
-  ['/api/auth/register', '/admin/api/auth/register'],
+  ['/auth/register', '/admin/auth/register', '/users/register', '/admin/users/register'],
   apiLimiter,
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
@@ -283,7 +283,7 @@ app.post(
 );
 
 app.post(
-  '/api/auth/login',
+  '/auth/login',
   authLimiter,
   [
     body('email').isEmail().withMessage('Valid email required'),
@@ -325,7 +325,7 @@ app.post(
   }
 );
 
-app.get('/api/auth/me', authenticate, async (req, res) => {
+app.get('/auth/me', authenticate, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password').lean();
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -342,8 +342,8 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
 });
 
 // Mount admin routes
-app.use('/api/admin', authenticate, isAdmin, adminRoutes);
-app.use('/api/auth', authRoutes);
+app.use('/admin', authenticate, isAdmin, adminRoutes);
+app.use('/auth', authRoutes);
 
 // Centralized error handler
 app.use(errorHandler);
