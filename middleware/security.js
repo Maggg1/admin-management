@@ -1,5 +1,9 @@
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
 // Rate limiting configuration
 const createRateLimit = (windowMs = 15 * 60 * 1000, max = 100) => {
@@ -17,10 +21,25 @@ const createRateLimit = (windowMs = 15 * 60 * 1000, max = 100) => {
 
 // Different rate limits for different endpoints
 const generalLimiter = createRateLimit(15 * 60 * 1000, 100); // 100 requests per 15 minutes
-const authLimiter = createRateLimit(15 * 60 * 1000, 5); // 5 login attempts per 15 minutes
-const apiLimiter = createRateLimit(15 * 60 * 1000, 50); // 50 API requests per 15 minutes
+const IS_PROD = process.env.NODE_ENV === 'production';
 
-// Security headers middleware
+// Rate limiting
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: IS_PROD ? 10 : 0, // 10 login attempts per 15m in prod, disabled otherwise
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: IS_PROD ? 100 : 0, // 100 requests per 15m in prod, disabled otherwise
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Security headers via Helmet
 const securityHeaders = helmet({
   contentSecurityPolicy: {
     directives: {
@@ -28,7 +47,7 @@ const securityHeaders = helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      scriptSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
       objectSrc: ["'none'"],
       upgradeInsecureRequests: [],
     },
@@ -106,11 +125,60 @@ const errorHandler = (err, req, res, next) => {
   });
 };
 
+// JWT Authentication Middleware
+const authenticate = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({
+      success: false,
+      message: 'No token provided'
+    });
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password');
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized'
+      });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: 'Not authorized, token failed'
+    });
+  }
+};
+
+// Authorization Middleware
+const authorize = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: `User role ${req.user ? req.user.role : 'none'} is not authorized to access this route`
+      });
+    }
+    next();
+  };
+};
+
 module.exports = {
   generalLimiter,
   authLimiter,
   apiLimiter,
   securityHeaders,
   sanitizeInput,
-  errorHandler
+  errorHandler,
+  authenticate,
+  authorize,
 };

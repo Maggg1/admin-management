@@ -1,20 +1,42 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const morgan = require('morgan');
 const jwt = require('jsonwebtoken');
 const { body } = require('express-validator');
+require('dotenv').config();
 
-const { authLimiter, apiLimiter, securityHeaders, sanitizeInput, errorHandler } = require('./middleware/security');
+const {
+  authLimiter,
+  apiLimiter,
+  securityHeaders,
+  sanitizeInput,
+  errorHandler,
+  authenticate,
+  authorize,
+} = require('./middleware/security');
 const handleValidation = require('./utils/validation');
 
 // Import routes
+const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const activitiesRoutes = require('./routes/activities');
+const shakesRoutes = require('./routes/shakes');
+const feedbacksRoutes = require('./routes/feedbacks');
+const usersRoutes = require('./routes/users');
+const rewardsRoutes = require('./routes/rewards');
 
 // Import models
 const User = require('./models/User');
+const Activity = require('./models/Activity');
+const Feedback = require('./models/Feedback');
+const Reward = require('./models/Reward');
 
 // App setup
 const app = express();
 
 // Configuration
-const PORT = process.env.PORT || 4000;
+// const PORT = process.env.PORT || 4000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017';
 const DB_NAME = process.env.DB_NAME || 'admin_backend';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
@@ -103,6 +125,7 @@ const corsOptions = {
 };
 
 // Security middleware
+app.set('trust proxy', 1);
 app.use(securityHeaders);
 
 // Core middleware
@@ -119,7 +142,7 @@ app.use(sanitizeInput);
 app.use(morgan('dev'));
 
 // Global API rate limiting
-app.use('/api', apiLimiter);
+app.use(apiLimiter);
 
 // Static admin client
 app.use('/admin', express.static('public/admin'));
@@ -139,11 +162,11 @@ app.get('/ready', (req, res) => {
 async function connectWithRetry(retries = 0) {
   try {
     await mongoose.connect(MONGO_URI, {
-      dbName: DB_NAME,
-      serverSelectionTimeoutMS: MONGO_TIMEOUT_MS,
-      connectTimeoutMS: MONGO_TIMEOUT_MS,
-      socketTimeoutMS: 20000,
-    });
+    serverSelectionTimeoutMS: MONGO_TIMEOUT_MS,
+    connectTimeoutMS: MONGO_TIMEOUT_MS,
+    socketTimeoutMS: 20000,
+  });
+
     console.log(`MongoDB connected: ${DB_NAME}`);
   } catch (error) {
     console.error(`MongoDB connection error (attempt ${retries + 1}):`, error.message);
@@ -164,186 +187,27 @@ function signToken(user) {
   });
 }
 
-// Auth middleware - MongoDB with JWT
-async function authenticate(req, res, next) {
-  const auth = req.headers.authorization || '';
-  const [scheme, token] = auth.split(' ');
-
-  if (scheme !== 'Bearer' || !token) {
-    return res.status(401).json({ message: 'Unauthorized' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.id).lean();
-    if (user && user.active) {
-      req.user = { id: user._id.toString(), role: user.role };
-      return next();
-    }
-    return res.status(401).json({ message: 'Unauthorized' });
-  } catch (err) {
-    console.error('Auth error:', err.message);
-    return res.status(401).json({ message: 'Unauthorized' });
-  }
-}
-
-function isAdmin(req, res, next) {
-  if (req.user?.role !== 'admin') {
-    return res.status(403).json({ message: 'Forbidden' });
-  }
-  return next();
-}
-
 // Routes
 app.get('/', (req, res) => res.redirect('/admin/login'));
 app.get('/favicon.ico', (req, res) =>
   res.status(204).set('Cache-Control', 'public, max-age=86400').end()
 );
 
-// Auth routes with rate limiting
-app.post(
-  '/api/auth/register-admin',
-  authLimiter,
-  [
-    body('name').trim().notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
-    body('password').isLength({ min: 6 }).withMessage('Password min length 6'),
-  ],
-  handleValidation,
-  async (req, res) => {
-    try {
-      const adminCount = await User.countDocuments({ role: 'admin' });
-      if (adminCount > 0) {
-        return res.status(403).json({
-          message: 'Admin already exists. Login as admin and use admin user creation endpoint to add more admins.',
-        });
-      }
+// Mount routers
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/admin', authenticate, authorize('admin'), adminRoutes);
+app.use('/api/activities', authenticate, activitiesRoutes);
+app.use('/api/shakes', authenticate, shakesRoutes);
+app.use('/api/feedbacks', authenticate, feedbacksRoutes);
+app.use('/api/users', authenticate, usersRoutes);
+app.use('/api/rewards', authenticate, rewardsRoutes);
 
-      const { name, email, password } = req.body;
-      const user = new User({ name, email, password, role: 'admin', emailVerified: true });
-      await user.save();
-
-      const token = signToken(user);
-      const safeUser = {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        active: user.active,
-      };
-      return res.status(201).json({ token, user: safeUser });
-    } catch (err) {
-      if (err?.code === 11000) {
-        return res.status(409).json({ message: 'Email already in use' });
-      }
-      console.error('register-admin error:', err);
-      return res.status(500).json({ message: 'Internal server error' });
-    }
-  }
-);
-
-app.post(
-  ['/api/auth/register', '/admin/api/auth/register'],
-  apiLimiter,
-  [
-    body('name').trim().notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
-    body('password').isLength({ min: 6 }).withMessage('Password min length 6'),
-  ],
-  handleValidation,
-  async (req, res) => {
-    try {
-      const { name, email, password } = req.body;
-      const user = new User({ name, email, password, role: 'user', active: true });
-      await user.save();
-
-      const token = signToken(user);
-      const safeUser = {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        active: user.active,
-      };
-      return res.status(201).json({ token, user: safeUser });
-    } catch (err) {
-      if (err?.code === 11000) {
-        return res.status(409).json({ message: 'Email already in use' });
-      }
-      console.error('register error:', err);
-      return res.status(500).json({ message: 'Internal server error' });
-    }
-  }
-);
-
-app.post(
-  '/api/auth/login',
-  authLimiter,
-  [
-    body('email').isEmail().withMessage('Valid email required'),
-    body('password').notEmpty().withMessage('Password required'),
-  ],
-  handleValidation,
-  async (req, res) => {
-    try {
-      const { email, password } = req.body;
-      const user = await User.findOne({ email }).select('+password');
-      if (!user) return res.status(400).json({ message: 'Invalid credentials' });
-      if (!user.active) return res.status(403).json({ message: 'User is disabled' });
-
-      const match = await user.comparePassword(password);
-      if (!match) return res.status(400).json({ message: 'Invalid credentials' });
-
-      // Ensure only admins can login to the dashboard
-      if (user.role !== 'admin') {
-        return res.status(403).json({ message: 'Access denied. Only admins can log in.' });
-      }
-
-      if (user.role !== 'admin' && typeof user.emailVerified === 'boolean' && !user.emailVerified) {
-        return res.status(403).json({ message: 'Email not verified' });
-      }
-
-      const token = signToken(user);
-      const safeUser = {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        active: user.active,
-      };
-      return res.json({ token, user: safeUser });
-    } catch (err) {
-      console.error('login error:', err);
-      return res.status(500).json({ message: 'Internal server error' });
-    }
-  }
-);
-
-app.get('/api/auth/me', authenticate, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id).select('-password').lean();
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    return res.json({
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      active: user.active,
-    });
-  } catch (err) {
-    return res.status(500).json({ message: 'Internal server error' });
-  }
-});
-
-// Mount admin routes
-app.use('/api/admin', authenticate, isAdmin, adminRoutes);
-
-// Global error handler
+// Error handling middleware
 app.use(errorHandler);
 
 // Start the server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 

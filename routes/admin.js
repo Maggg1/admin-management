@@ -7,6 +7,10 @@ const { body, param, query } = require('express-validator');
 // Local modules (to be created): User model and validation helper
 const User = require('../models/User');
 const handleValidation = require('../utils/validation');
+const { authenticate, authorize } = require('../middleware/security');
+const Activity = require('../models/Activity');
+const Feedback = require('../models/Feedback');
+const Reward = require('../models/Reward');
 
 const router = express.Router();
 
@@ -178,6 +182,251 @@ router.delete(
         return res.status(400).json({ message: 'Invalid user ID format' });
       }
       return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
+// GET /api/admin/activities
+router.get('/activities', async (req, res) => {
+  try {
+    const { type, limit = 10 } = req.query;
+    const query = {};
+    if (type) {
+      query.type = type;
+    }
+    const activities = await Activity.find(query)
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit));
+    res.json(activities);
+  } catch (err) {
+    console.error('get activities error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/admin/activities
+router.post('/activities', async (req, res) => {
+  try {
+    const { type, user, details } = req.body;
+    const activity = new Activity({
+      type,
+      user,
+      details,
+    });
+    await activity.save();
+    res.status(201).json(activity);
+  } catch (error) {
+    res.status(400).json({ message: 'Error creating activity', error: error.message });
+  }
+});
+
+// POST /admin/shakes
+router.post('/shakes', authorize('admin'), async (req, res) => {
+  try {
+    const { userId, amount } = req.body;
+    const activity = new Activity({
+      type: 'shake',
+      user: userId,
+      details: { amount },
+    });
+    await activity.save();
+    res.status(201).json(activity);
+  } catch (error) {
+    res.status(400).json({ message: 'Error creating shake activity', error: error.message });
+  }
+});
+
+// GET /admin/shakes
+router.get('/shakes', authorize('admin'), async (req, res) => {
+  try {
+    const shakes = await Activity.find({ type: 'shake' }).populate('user', 'name email');
+    res.json(shakes);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching shakes', error: error.message });
+  }
+});
+
+// GET /admin/activities
+router.get('/activities', async (req, res) => {
+  try {
+    const { type, limit } = req.query;
+    const query = {};
+    if (type) {
+      query.type = type;
+    }
+
+    let activityQuery = Activity.find(query).populate('user', 'name email').sort({ createdAt: -1 });
+    if (limit) {
+      activityQuery = activityQuery.limit(parseInt(limit, 10));
+    }
+
+    const activities = await activityQuery;
+    res.json(activities);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching activities', error: error.message });
+  }
+});
+
+// GET /admin/shakes
+router.get('/shakes', async (req, res) => {
+  try {
+    const shakes = await Activity.find({ type: 'shake' }).populate('user', 'name email').sort({ createdAt: -1 });
+    res.json(shakes);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching shakes', error: error.message });
+  }
+});
+
+// GET /admin/feedbacks
+const getFeedbacksHandler = [
+  query('page').optional().isInt({ min: 1 }).toInt(),
+  query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+  query('search').optional().isString().trim(),
+  handleValidation,
+  async (req, res) => {
+    try {
+      const page = req.query.page || 1;
+      const limit = req.query.limit || 50;
+      const search = req.query.search || '';
+
+      const filter = {};
+      if (search) {
+        const users = await User.find({
+          $or: [
+            { name: { $regex: search, $options: 'i' } },
+            { email: { $regex: search, $options: 'i' } },
+          ],
+        }).select('_id');
+        const userIds = users.map((u) => u._id);
+
+        filter.$or = [
+          { message: { $regex: search, $options: 'i' } },
+          { type: { $regex: search, $options: 'i' } },
+          { user: { $in: userIds } },
+        ];
+      }
+
+      const total = await Feedback.countDocuments(filter);
+      const feedbacks = await Feedback.find(filter)
+        .populate('user', 'name email')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean();
+
+      res.json({
+        data: feedbacks,
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      });
+    } catch (error) {
+      console.error('Error fetching feedbacks:', error);
+      res.status(500).json({ message: 'Error fetching feedbacks', error: error.message });
+    }
+  },
+];
+
+router.get('/feedbacks', getFeedbacksHandler);
+router.get('/feedback', getFeedbacksHandler);
+
+// Rewards CRUD
+// POST /api/admin/rewards - create a reward
+router.post(
+  '/rewards',
+  [
+    body('name').trim().notEmpty().withMessage('Name is required'),
+    body('points').isInt({ min: 0 }).withMessage('Points must be a non-negative integer'),
+    body('description').optional().isString().trim(),
+    body('active').optional().isBoolean(),
+  ],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const { name, description, points, active } = req.body;
+      const reward = new Reward({ name, description, points, active });
+      await reward.save();
+      res.status(201).json(reward);
+    } catch (err) {
+      console.error('create reward error:', err);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
+// GET /api/admin/rewards - list rewards
+router.get('/rewards', async (req, res) => {
+  try {
+    const rewards = await Reward.find({}).sort({ createdAt: -1 });
+    res.json(rewards);
+  } catch (err) {
+    console.error('list rewards error:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/rewards/:id - get reward by ID
+router.get(
+  '/rewards/:id',
+  [param('id').custom((v) => mongoose.Types.ObjectId.isValid(v)).withMessage('Invalid ID')],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const reward = await Reward.findById(req.params.id);
+      if (!reward) return res.status(404).json({ message: 'Reward not found' });
+      res.json(reward);
+    } catch (err) {
+      console.error('get reward error:', err);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
+// PATCH /api/admin/rewards/:id - update a reward
+router.patch(
+  '/rewards/:id',
+  [
+    param('id').custom((v) => mongoose.Types.ObjectId.isValid(v)).withMessage('Invalid ID'),
+    body('name').optional().trim().notEmpty().withMessage('Name is required'),
+    body('points').optional().isInt({ min: 0 }).withMessage('Points must be a non-negative integer'),
+    body('description').optional().isString().trim(),
+    body('active').optional().isBoolean(),
+  ],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const reward = await Reward.findById(req.params.id);
+      if (!reward) return res.status(404).json({ message: 'Reward not found' });
+
+      const { name, description, points, active } = req.body;
+      if (name) reward.name = name;
+      if (description) reward.description = description;
+      if (points !== undefined) reward.points = points;
+      if (active !== undefined) reward.active = active;
+
+      await reward.save();
+      res.json(reward);
+    } catch (err) {
+      console.error('update reward error:', err);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
+// DELETE /api/admin/rewards/:id - delete a reward
+router.delete(
+  '/rewards/:id',
+  [param('id').custom((v) => mongoose.Types.ObjectId.isValid(v)).withMessage('Invalid ID')],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const reward = await Reward.findByIdAndDelete(req.params.id);
+      if (!reward) return res.status(404).json({ message: 'Reward not found' });
+      res.json({ success: true, message: 'Reward deleted' });
+    } catch (err) {
+      console.error('delete reward error:', err);
+      res.status(500).json({ message: 'Internal server error' });
     }
   }
 );
