@@ -343,8 +343,7 @@ app.get('/api/auth/me', authenticate, async (req, res) => {
 
 // Mount admin routes
 app.use('/api/admin', authenticate, isAdmin, adminRoutes);
-app.use('/admin/auth', authRoutes); // Handle /admin/auth/register
-app.use('/admin/users', authRoutes); // Handle /admin/users/register
+app.use('/api/auth', authRoutes);
 
 // Centralized error handler
 app.use(errorHandler);

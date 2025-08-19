@@ -7,6 +7,8 @@ const { body, param, query } = require('express-validator');
 // Local modules (to be created): User model and validation helper
 const User = require('../models/User');
 const handleValidation = require('../utils/validation');
+const { authenticate, authorize } = require('../middleware/security');
+const Activity = require('../models/Activity');
 
 const router = express.Router();
 
@@ -181,5 +183,23 @@ router.delete(
     }
   }
 );
+
+// GET /api/admin/activities
+router.get('/activities', async (req, res) => {
+  try {
+    const { type, limit = 10 } = req.query;
+    const query = {};
+    if (type) {
+      query.type = type;
+    }
+    const activities = await Activity.find(query)
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit));
+    res.json(activities);
+  } catch (err) {
+    console.error('get activities error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 module.exports = router;

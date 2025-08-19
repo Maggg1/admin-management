@@ -2,6 +2,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const { body } = require('express-validator');
+const { authenticate } = require('../middleware/security'); // Make sure you have this
 
 const User = require('../models/User');
 const handleValidation = require('../utils/validation');
@@ -137,5 +138,19 @@ router.post(
     }
   }
 );
+
+// GET /api/auth/me - Get current user
+router.get('/me', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json(user);
+  } catch (err) {
+    console.error('get user error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 module.exports = router;
