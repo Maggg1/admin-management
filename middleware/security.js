@@ -5,39 +5,7 @@ const User = require('../models/User');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
-// Rate limiting configuration
-const createRateLimit = (windowMs = 15 * 60 * 1000, max = 100) => {
-  return rateLimit({
-    windowMs,
-    max,
-    message: {
-      success: false,
-      message: 'Too many requests from this IP, please try again later.',
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-};
 
-// Different rate limits for different endpoints
-const generalLimiter = createRateLimit(15 * 60 * 1000, 100); // 100 requests per 15 minutes
-const IS_PROD = process.env.NODE_ENV === 'production';
-
-// Rate limiting
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: IS_PROD ? 10 : 0, // 10 login attempts per 15m in prod, disabled otherwise
-  message: 'Too many requests from this IP, please try again later.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: IS_PROD ? 100 : 0, // 100 requests per 15m in prod, disabled otherwise
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
 // Security headers via Helmet
 const securityHeaders = helmet({
@@ -177,9 +145,6 @@ const authorize = (...roles) => {
 };
 
 module.exports = {
-  generalLimiter,
-  authLimiter,
-  apiLimiter,
   securityHeaders,
   sanitizeInput,
   errorHandler,
