@@ -7,8 +7,6 @@ const { body } = require('express-validator');
 require('dotenv').config();
 
 const {
-  authLimiter,
-  apiLimiter,
   securityHeaders,
   sanitizeInput,
   errorHandler,
@@ -142,7 +140,7 @@ app.use(sanitizeInput);
 app.use(morgan('dev'));
 
 // Global API rate limiting
-app.use(apiLimiter);
+
 
 // Static admin client
 app.use('/admin', express.static('public/admin'));
@@ -194,7 +192,7 @@ app.get('/favicon.ico', (req, res) =>
 );
 
 // Mount routers
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/admin', authenticate, authorize('admin'), adminRoutes);
 app.use('/api/activities', authenticate, activitiesRoutes);
 app.use('/api/shakes', authenticate, shakesRoutes);
