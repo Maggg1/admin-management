@@ -6,7 +6,15 @@ const jwt = require('jsonwebtoken');
 const { body } = require('express-validator');
 require('dotenv').config();
 
-const { authLimiter, apiLimiter, securityHeaders, sanitizeInput, errorHandler } = require('./middleware/security');
+const {
+  authLimiter,
+  apiLimiter,
+  securityHeaders,
+  sanitizeInput,
+  errorHandler,
+  authenticate,
+  authorize,
+} = require('./middleware/security');
 const handleValidation = require('./utils/validation');
 
 // Import routes
@@ -170,36 +178,6 @@ function signToken(user) {
   });
 }
 
-// Auth middleware - MongoDB with JWT
-async function authenticate(req, res, next) {
-  const auth = req.headers.authorization || '';
-  const [scheme, token] = auth.split(' ');
-
-  if (scheme !== 'Bearer' || !token) {
-    return res.status(401).json({ message: 'Unauthorized' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.id).lean();
-    if (user && user.active) {
-      req.user = { id: user._id.toString(), role: user.role };
-      return next();
-    }
-    return res.status(401).json({ message: 'Unauthorized' });
-  } catch (err) {
-    console.error('Auth error:', err.message);
-    return res.status(401).json({ message: 'Unauthorized' });
-  }
-}
-
-function isAdmin(req, res, next) {
-  if (req.user?.role !== 'admin') {
-    return res.status(403).json({ message: 'Forbidden' });
-  }
-  return next();
-}
-
 // Routes
 app.get('/', (req, res) => res.redirect('/admin/login'));
 app.get('/favicon.ico', (req, res) =>
@@ -342,9 +320,9 @@ app.get('/auth/me', authenticate, async (req, res) => {
 });
 
 // Mount admin routes
-app.use('/admin', authenticate, isAdmin, adminRoutes);
+app.use('/admin', authenticate, authorize('admin'), adminRoutes);
 app.use('/auth', authRoutes);
-app.use(authenticate, adminRoutes); // Handle /activities
+app.use(authenticate, adminRoutes);
 
 // Centralized error handler
 app.use(errorHandler);
