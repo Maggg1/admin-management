@@ -455,6 +455,55 @@ async function confirmDialog(text) {
   });
 }
 
+// Theme management
+function initTheme() {
+  const THEME_KEY = 'admin_theme';
+  const themeToggle = $('#themeToggle');
+  
+  function applyTheme(mode) {
+    document.documentElement.classList.toggle('theme-light', mode === 'light');
+    document.documentElement.classList.toggle('theme-dark', mode === 'dark');
+    localStorage.setItem(THEME_KEY, mode);
+    if (themeToggle) {
+      themeToggle.checked = mode === 'dark';
+    }
+  }
+  
+  function toggleTheme() {
+    const current = localStorage.getItem(THEME_KEY) || 'light';
+    const newMode = current === 'light' ? 'dark' : 'light';
+    applyTheme(newMode);
+  }
+  
+  // Initialize theme
+  const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
+  applyTheme(savedTheme);
+  
+  // Set up event listener
+  if (themeToggle) {
+    themeToggle.addEventListener('change', toggleTheme);
+  }
+}
+
+// Enhanced section activation with theme sync
+function activateSection(id) {
+  ['usersSection','feedbackSection','shakesSection','rewardsSection','settingsSection'].forEach(sec => {
+    const node = document.getElementById(sec);
+    if (node) node.hidden = true;
+  });
+  const target = document.getElementById(id);
+  if (target) target.hidden = false;
+  
+  document.querySelectorAll('.navbtn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.target === id);
+  });
+  
+  // Sync theme toggle when settings section is opened
+  if (id === 'settingsSection') {
+    initTheme();
+  }
+}
+
 (async function init() {
   const token = getToken();
   if (token) {
@@ -463,6 +512,7 @@ async function confirmDialog(text) {
     hide($('#authSection'));
     $('#dashboardNav').hidden = false;
     activateSection('usersSection');
+    initTheme(); // Initialize theme on app load
     try { await refreshUsers(); } catch (err) { setMsg($('#usersMsg'), err.message, true); toast(err.message, true); }
   } else {
     // Not logged in; redirect to login page
