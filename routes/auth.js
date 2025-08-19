@@ -106,10 +106,6 @@ router.post(
       const match = await user.comparePassword(password);
       if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 
-      if (user.role !== 'admin' && typeof user.emailVerified === 'boolean' && !user.emailVerified) {
-        return res.status(403).json({ message: 'Email not verified' });
-      }
-
       const token = signToken(user);
       const safeUser = {
         id: user._id,
