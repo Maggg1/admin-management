@@ -323,13 +323,13 @@ app.get('/auth/me', authenticate, async (req, res) => {
 });
 
 // Mount routers
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/admin', authenticate, authorize('admin'), adminRoutes);
-app.use('/api/activities', authenticate, activitiesRoutes);
-app.use('/api/shakes', authenticate, shakesRoutes);
-app.use('/api/feedbacks', authenticate, feedbacksRoutes);
-app.use('/api/users', authenticate, usersRoutes);
-app.use('/api/rewards', authenticate, rewardsRoutes);
+app.use('/auth', authLimiter, authRoutes);
+app.use('/admin', authenticate, authorize('admin'), adminRoutes);
+app.use('/activities', authenticate, activitiesRoutes);
+app.use('/shakes', authenticate, shakesRoutes);
+app.use('/feedbacks', authenticate, feedbacksRoutes);
+app.use('/users', authenticate, usersRoutes);
+app.use('/rewards', authenticate, rewardsRoutes);
 
 // Error handling middleware
 app.use(errorHandler);
