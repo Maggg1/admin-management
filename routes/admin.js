@@ -202,4 +202,21 @@ router.get('/activities', async (req, res) => {
   }
 });
 
+// POST /api/admin/activities
+router.post('/activities', async (req, res) => {
+  try {
+    const { type, details } = req.body;
+    const activity = new Activity({
+      user: req.user.id,
+      type,
+      details,
+    });
+    await activity.save();
+    res.status(201).json(activity);
+  } catch (err) {
+    console.error('create activity error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;
