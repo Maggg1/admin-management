@@ -23,6 +23,7 @@ const authRoutes = require('./routes/auth');
 const activityRoutes = require('./routes/activities');
 const shakesRoutes = require('./routes/shakes');
 const feedbacksRoutes = require('./routes/feedbacks');
+const usersRoutes = require('./routes/users');
 
 // Import models
 const User = require('./models/User');
@@ -325,6 +326,7 @@ app.use('/auth', authRoutes);
 app.use('/activities', activityRoutes);
 app.use('/shakes', shakesRoutes);
 app.use('/feedbacks', feedbacksRoutes);
+app.use('/users', usersRoutes);
 
 // Centralized error handler
 app.use(errorHandler);

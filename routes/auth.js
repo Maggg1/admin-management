@@ -153,41 +153,4 @@ router.get('/me', authenticate, async (req, res) => {
   }
 });
 
-// PATCH /api/auth/me - Update current user
-router.patch(
-  '/me',
-  authenticate,
-  [
-    body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
-    body('email').optional().isEmail().withMessage('Valid email required').normalizeEmail(),
-  ],
-  handleValidation,
-  async (req, res) => {
-    try {
-      const user = await User.findById(req.user.id);
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-
-      const { name, email } = req.body;
-      if (name) {
-        user.name = name;
-      }
-      if (email) {
-        const existingUser = await User.findOne({ email });
-        if (existingUser && existingUser._id.toString() !== req.user.id) {
-          return res.status(409).json({ message: 'Email already in use' });
-        }
-        user.email = email;
-      }
-
-      await user.save();
-      res.json(await User.findById(req.user.id).select('-password'));
-    } catch (err) {
-      console.error('update user error:', err);
-      res.status(500).json({ message: 'Server error' });
-    }
-  }
-);
-
 module.exports = router;
