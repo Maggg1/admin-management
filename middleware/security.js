@@ -63,6 +63,10 @@ const securityHeaders = helmet({
 const sanitizeInput = (req, res, next) => {
   const sanitize = (obj) => {
     if (typeof obj === 'string') {
+      // If the string contains an @, assume it's an email and don't sanitize it.
+      if (obj.includes('@')) {
+        return obj.trim();
+      }
       return obj.trim().replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
     }
     if (typeof obj === 'object' && obj !== null) {
