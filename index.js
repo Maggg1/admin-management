@@ -1,8 +1,8 @@
 const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const morgan = require('morgan');
 const jwt = require('jsonwebtoken');
+const cors = require('cors');
+const mongoose = require('mongoose');
+const morgan = require('morgan');
 const { body } = require('express-validator');
 require('dotenv').config();
 
