@@ -99,12 +99,35 @@ router.post(
   async (req, res) => {
     try {
       const { email, password } = req.body;
+      
+      // Enhanced logging for debugging
+      console.log(`🔐 Login attempt for email: ${email}`);
+      
       const user = await User.findOne({ email }).select('+password');
-      if (!user) return res.status(401).json({ message: 'Invalid credentials' });
-      if (!user.active) return res.status(403).json({ message: 'User is disabled' });
+      if (!user) {
+        console.log(`❌ Login failed: User not found for email: ${email}`);
+        return res.status(401).json({ 
+          message: 'Invalid credentials',
+          debug: process.env.NODE_ENV === 'development' ? 'User not found' : undefined
+        });
+      }
+      
+      if (!user.active) {
+        console.log(`❌ Login failed: User account disabled for email: ${email}`);
+        return res.status(403).json({ 
+          message: 'User is disabled',
+          debug: process.env.NODE_ENV === 'development' ? 'Account inactive' : undefined
+        });
+      }
 
       const match = await user.comparePassword(password);
-      if (!match) return res.status(401).json({ message: 'Invalid credentials' });
+      if (!match) {
+        console.log(`❌ Login failed: Invalid password for email: ${email}`);
+        return res.status(401).json({ 
+          message: 'Invalid credentials',
+          debug: process.env.NODE_ENV === 'development' ? 'Password mismatch' : undefined
+        });
+      }
 
       const token = signToken(user);
       const safeUser = {
@@ -114,10 +137,15 @@ router.post(
         role: user.role,
         active: user.active,
       };
+      
+      console.log(`✅ Login successful for email: ${email}`);
       return res.json({ token, user: safeUser });
     } catch (err) {
-      console.error('login error:', err);
-      return res.status(500).json({ message: 'Internal server error' });
+      console.error('🔥 Login error:', err);
+      return res.status(500).json({ 
+        message: 'Internal server error',
+        debug: process.env.NODE_ENV === 'development' ? err.message : undefined
+      });
     }
   }
 );
