@@ -1,5 +1,10 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const morgan = require('morgan');
 const jwt = require('jsonwebtoken');
 const { body } = require('express-validator');
+require('dotenv').config();
 
 const { authLimiter, apiLimiter, securityHeaders, sanitizeInput, errorHandler } = require('./middleware/security');
 const handleValidation = require('./utils/validation');
@@ -14,7 +19,7 @@ const User = require('./models/User');
 const app = express();
 
 // Configuration
-const PORT = process.env.PORT || 4000;
+// const PORT = process.env.PORT || 4000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017';
 const DB_NAME = process.env.DB_NAME || 'admin_backend';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
@@ -343,7 +348,7 @@ app.use(errorHandler);
 
 // Start the server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
 
