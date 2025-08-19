@@ -344,6 +344,7 @@ app.get('/auth/me', authenticate, async (req, res) => {
 // Mount admin routes
 app.use('/admin', authenticate, isAdmin, adminRoutes);
 app.use('/auth', authRoutes);
+app.use(authenticate, adminRoutes); // Handle /activities
 
 // Centralized error handler
 app.use(errorHandler);
