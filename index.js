@@ -21,9 +21,13 @@ const handleValidation = require('./utils/validation');
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
 const activityRoutes = require('./routes/activities');
+const shakesRoutes = require('./routes/shakes');
+const feedbacksRoutes = require('./routes/feedbacks');
 
 // Import models
 const User = require('./models/User');
+const Activity = require('./models/Activity');
+const Feedback = require('./models/Feedback');
 
 // App setup
 const app = express();
@@ -319,6 +323,8 @@ app.get('/auth/me', authenticate, async (req, res) => {
 app.use('/admin', authenticate, authorize('admin'), adminRoutes);
 app.use('/auth', authRoutes);
 app.use('/activities', activityRoutes);
+app.use('/shakes', shakesRoutes);
+app.use('/feedbacks', feedbacksRoutes);
 
 // Centralized error handler
 app.use(errorHandler);

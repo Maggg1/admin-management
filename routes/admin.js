@@ -9,6 +9,7 @@ const User = require('../models/User');
 const handleValidation = require('../utils/validation');
 const { authenticate, authorize } = require('../middleware/security');
 const Activity = require('../models/Activity');
+const Feedback = require('../models/Feedback');
 
 const router = express.Router();
 
@@ -262,6 +263,26 @@ router.get('/activities', async (req, res) => {
     res.json(activities);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching activities', error: error.message });
+  }
+});
+
+// GET /admin/shakes
+router.get('/shakes', async (req, res) => {
+  try {
+    const shakes = await Activity.find({ type: 'shake' }).populate('user', 'name email').sort({ createdAt: -1 });
+    res.json(shakes);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching shakes', error: error.message });
+  }
+});
+
+// GET /admin/feedbacks
+router.get('/feedbacks', async (req, res) => {
+  try {
+    const feedbacks = await Feedback.find({}).populate('user', 'name email').sort({ createdAt: -1 });
+    res.json(feedbacks);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching feedbacks', error: error.message });
   }
 });
 
