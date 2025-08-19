@@ -52,4 +52,50 @@ router.post(
   }
 );
 
+// POST /api/auth/login - for regular user login from Expo
+router.post(
+  '/auth/login',
+  [
+    body('email').isEmail().withMessage('Valid email required').normalizeEmail(),
+    body('password').notEmpty().withMessage('Password is required'),
+  ],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      const user = await User.findOne({ email });
+
+      if (!user) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      const isMatch = await user.comparePassword(password);
+      if (!isMatch) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+
+      if (!user.active) {
+        return res.status(403).json({ message: 'Account is not active' });
+      }
+
+      const payload = { id: user._id, email: user.email, role: user.role };
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+
+      return res.status(200).json({
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          active: user.active,
+        },
+      });
+    } catch (err) {
+      console.error('login error:', err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+);
+
 module.exports = router;
