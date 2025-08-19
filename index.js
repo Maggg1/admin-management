@@ -322,14 +322,14 @@ app.get('/auth/me', authenticate, async (req, res) => {
   }
 });
 
-// Mount admin routes
-app.use('/api/admin', authenticate, authorize('admin'), adminRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/activities', authenticate, activityRoutes);
-app.use('/api/shakes', authenticate, shakesRoutes);
-app.use('/api/feedbacks', authenticate, feedbacksRoutes);
-app.use('/api/users', authenticate, usersRoutes);
-app.use('/api/rewards', authenticate, rewardsRoutes);
+// Mount routes
+app.use('/admin', authenticate, authorize('admin'), adminRoutes);
+app.use('/auth', authRoutes);
+app.use('/activities', authenticate, activityRoutes);
+app.use('/shakes', authenticate, shakesRoutes);
+app.use('/feedbacks', authenticate, feedbacksRoutes);
+app.use('/users', authenticate, usersRoutes);
+app.use('/rewards', authenticate, rewardsRoutes);
 
 // Centralized error handler
 app.use(errorHandler);
