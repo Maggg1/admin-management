@@ -14,8 +14,6 @@ const {
   errorHandler,
   authenticate,
   authorize,
-  errorHandler,
-  authLimiter
 } = require('./middleware/security');
 const handleValidation = require('./utils/validation');
 
