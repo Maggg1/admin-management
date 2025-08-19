@@ -317,7 +317,31 @@ app.get('/auth/me', authenticate, async (req, res) => {
 // Mount admin routes
 app.use('/admin', authenticate, authorize('admin'), adminRoutes);
 app.use('/auth', authRoutes);
-app.use(authenticate, adminRoutes);
+
+// Add new /shakes endpoints for authenticated users
+app.post('/shakes', authenticate, async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const activity = new Activity({
+      type: 'shake',
+      user: req.user.id,
+      details: { amount },
+    });
+    await activity.save();
+    res.status(201).json(activity);
+  } catch (error) {
+    res.status(400).json({ message: 'Error creating shake activity', error: error.message });
+  }
+});
+
+app.get('/shakes', authenticate, async (req, res) => {
+  try {
+    const shakes = await Activity.find({ type: 'shake', user: req.user.id });
+    res.json(shakes);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching shakes', error: error.message });
+  }
+});
 
 // Centralized error handler
 app.use(errorHandler);

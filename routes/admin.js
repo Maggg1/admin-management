@@ -205,17 +205,42 @@ router.get('/activities', async (req, res) => {
 // POST /api/admin/activities
 router.post('/activities', async (req, res) => {
   try {
-    const { type, details } = req.body;
+    const { type, user, details } = req.body;
     const activity = new Activity({
-      user: req.user.id,
       type,
+      user,
       details,
     });
     await activity.save();
     res.status(201).json(activity);
-  } catch (err) {
-    console.error('create activity error:', err);
-    res.status(500).json({ message: 'Server error' });
+  } catch (error) {
+    res.status(400).json({ message: 'Error creating activity', error: error.message });
+  }
+});
+
+// POST /admin/shakes
+router.post('/shakes', authorize('admin'), async (req, res) => {
+  try {
+    const { userId, amount } = req.body;
+    const activity = new Activity({
+      type: 'shake',
+      user: userId,
+      details: { amount },
+    });
+    await activity.save();
+    res.status(201).json(activity);
+  } catch (error) {
+    res.status(400).json({ message: 'Error creating shake activity', error: error.message });
+  }
+});
+
+// GET /admin/shakes
+router.get('/shakes', authorize('admin'), async (req, res) => {
+  try {
+    const shakes = await Activity.find({ type: 'shake' }).populate('user', 'name email');
+    res.json(shakes);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching shakes', error: error.message });
   }
 });
 
