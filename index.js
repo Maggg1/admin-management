@@ -11,6 +11,7 @@ const handleValidation = require('./utils/validation');
 
 // Import routes
 const adminRoutes = require('./routes/admin');
+const authRoutes = require('./routes/auth');
 
 // Import models
 const User = require('./models/User');

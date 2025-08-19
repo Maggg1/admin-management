@@ -9,6 +9,46 @@ const handleValidation = require('../utils/validation');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret'; // replace in production
 
+// POST /api/auth/register - for regular user registration from Expo
+router.post(
+  '/register',
+  [
+    body('name').trim().notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email required').normalizeEmail(),
+    body('password').isLength({ min: 6 }).withMessage('Password min length is 6'),
+  ],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const { name, email, password } = req.body;
+      let user = await User.findOne({ email });
+      if (user) {
+        return res.status(409).json({ message: 'Email already in use' });
+      }
+
+      user = new User({ name, email, password, role: 'user' }); // Default role is 'user'
+      await user.save();
+
+      const payload = { id: user._id, email: user.email, role: user.role };
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+
+      return res.status(201).json({
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          active: user.active,
+        },
+      });
+    } catch (err) {
+      console.error('register error:', err);
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+);
+
 // POST /api/auth/register-admin
 router.post(
   '/auth/register-admin',
