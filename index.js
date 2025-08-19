@@ -341,38 +341,11 @@ app.use('/api/admin', authenticate, isAdmin, adminRoutes);
 // Global error handler
 app.use(errorHandler);
 
-// Start server with auto port fallback
-let server;
-function startServer(p, attempt = 0) {
-  try {
-    server = app.listen(p, '0.0.0.0', () => {
-      console.log(`Server running on http://0.0.0.0:${p}`);
-      // Configure server timeouts
-      try {
-        server.keepAliveTimeout = 65000;
-        server.headersTimeout = 66000;
-      } catch (_) {}
-    });
-
-    server.on('error', (err) => {
-      if (err && err.code === 'EADDRINUSE') {
-        const next = (Number(p) || 0) + 1;
-        if (attempt < 10) {
-          console.warn(`Port ${p} in use, attempting ${next}...`);
-          setTimeout(() => startServer(next, attempt + 1), 500);
-        } else {
-          console.error(`Failed to bind after ${attempt + 1} attempts`);
-          process.exit(1);
-        }
-      } else {
-        console.error('Server error:', err);
-      }
-    });
-  } catch (err) {
-    console.error('Server start exception:', err);
-  }
-}
-startServer(PORT);
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
 
 // Graceful shutdown
 function gracefulShutdown(signal) {
