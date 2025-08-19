@@ -125,6 +125,7 @@ const corsOptions = {
 };
 
 // Security middleware
+app.set('trust proxy', 1);
 app.use(securityHeaders);
 
 // Core middleware
