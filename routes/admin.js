@@ -244,4 +244,25 @@ router.get('/shakes', authorize('admin'), async (req, res) => {
   }
 });
 
+// GET /admin/activities
+router.get('/activities', async (req, res) => {
+  try {
+    const { type, limit } = req.query;
+    const query = {};
+    if (type) {
+      query.type = type;
+    }
+
+    let activityQuery = Activity.find(query).populate('user', 'name email').sort({ createdAt: -1 });
+    if (limit) {
+      activityQuery = activityQuery.limit(parseInt(limit, 10));
+    }
+
+    const activities = await activityQuery;
+    res.json(activities);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching activities', error: error.message });
+  }
+});
+
 module.exports = router;

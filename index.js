@@ -20,6 +20,7 @@ const handleValidation = require('./utils/validation');
 // Import routes
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
+const activityRoutes = require('./routes/activities');
 
 // Import models
 const User = require('./models/User');
@@ -317,31 +318,7 @@ app.get('/auth/me', authenticate, async (req, res) => {
 // Mount admin routes
 app.use('/admin', authenticate, authorize('admin'), adminRoutes);
 app.use('/auth', authRoutes);
-
-// Add new /shakes endpoints for authenticated users
-app.post('/shakes', authenticate, async (req, res) => {
-  try {
-    const { amount } = req.body;
-    const activity = new Activity({
-      type: 'shake',
-      user: req.user.id,
-      details: { amount },
-    });
-    await activity.save();
-    res.status(201).json(activity);
-  } catch (error) {
-    res.status(400).json({ message: 'Error creating shake activity', error: error.message });
-  }
-});
-
-app.get('/shakes', authenticate, async (req, res) => {
-  try {
-    const shakes = await Activity.find({ type: 'shake', user: req.user.id });
-    res.json(shakes);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching shakes', error: error.message });
-  }
-});
+app.use('/activities', activityRoutes);
 
 // Centralized error handler
 app.use(errorHandler);
