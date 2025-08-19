@@ -24,11 +24,13 @@ const activityRoutes = require('./routes/activities');
 const shakesRoutes = require('./routes/shakes');
 const feedbacksRoutes = require('./routes/feedbacks');
 const usersRoutes = require('./routes/users');
+const rewardsRoutes = require('./routes/rewards');
 
 // Import models
 const User = require('./models/User');
 const Activity = require('./models/Activity');
 const Feedback = require('./models/Feedback');
+const Reward = require('./models/Reward');
 
 // App setup
 const app = express();
@@ -327,6 +329,7 @@ app.use('/api/activities', authenticate, activityRoutes);
 app.use('/api/shakes', authenticate, shakesRoutes);
 app.use('/api/feedbacks', authenticate, feedbacksRoutes);
 app.use('/api/users', authenticate, usersRoutes);
+app.use('/api/rewards', authenticate, rewardsRoutes);
 
 // Centralized error handler
 app.use(errorHandler);
