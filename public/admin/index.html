@@ -448,3 +448,99 @@
   </script>
 </body>
 </html>
+
+<main class="main-content">
+  <section id="users" class="page" style="display: block;">
+    <div class="page-header">
+      <h1>Rewards</h1>
+      <button class="btn primary" id="addRewardBtn">Add New Reward</button>
+    </div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Probability</th>
+            <th>Image</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rewardsTableBody">
+          <!-- Rewards will be populated here -->
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="shakes" class="page">
+    <h1>Shakes</h1>
+    <p>Shake history and analytics will be displayed here.</p>
+  </section>
+</main>
+
+<dialog id="editDialog" class="dialog">
+  <form method="dialog" id="editForm" class="dialog-form">
+    <input type="hidden" id="eId" />
+    <label>Name<input type="text" id="eName" required /></label>
+    <label>Email<input type="email" id="eEmail" required /></label>
+    <label>Password (leave blank to keep)
+      <input type="password" id="ePassword" minlength="6" />
+    </label>
+    <label>Role
+      <select id="eRole">
+        <option value="user">User</option>
+        <option value="admin">Admin</option>
+      </select>
+    </label>
+    <label>Active
+      <select id="eActive">
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </select>
+    </label>
+    <menu>
+      <button type="button" class="btn btn-secondary" onclick="document.getElementById('editDialog').close()">Cancel</button>
+      <button value="default" class="btn btn-primary">Save</button>
+    </menu>
+    <div id="editMsg" class="msg"></div>
+  </form>
+</dialog>
+
+<dialog id="createRewardDialog" class="dialog">
+  <form method="dialog" id="createRewardForm" class="dialog-form">
+    <h2>Add New Reward</h2>
+    <label>Name <input type="text" id="createRewardName" required></label>
+    <label>Description <textarea id="createRewardDescription"></textarea></label>
+    <label>Image URL <input type="url" id="createRewardImageUrl"></label>
+    <label>Probability (%) <input type="number" id="createRewardProbability" min="0" max="100" step="0.1" required></label>
+    <div class="dialog-actions">
+      <button value="cancel" class="btn">Cancel</button>
+      <button value="default" class="btn primary">Create Reward</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="editRewardDialog" class="dialog">
+  <form method="dialog" id="editRewardForm" class="dialog-form">
+    <h2>Edit Reward</h2>
+    <input type="hidden" id="editRewardId">
+    <label>Name <input type="text" id="editRewardName" required></label>
+    <label>Description <textarea id="editRewardDescription"></textarea></label>
+    <label>Image URL <input type="url" id="editRewardImageUrl"></label>
+    <label>Probability (%) <input type="number" id="editRewardProbability" min="0" max="100" step="0.1" required></label>
+    <div class="dialog-actions">
+      <button value="cancel" class="btn">Cancel</button>
+      <button value="default" class="btn primary">Save Changes</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="confirmDialog" class="dialog">
+  <form method="dialog" id="confirmForm" class="dialog-form">
+    <p id="confirmText">Are you sure?</p>
+    <menu>
+      <button value="cancel" class="btn btn-secondary">Cancel</button>
+      <button id="confirmOk" value="default" class="btn btn-primary">OK</button>
+    </menu>
+  </form>
+</dialog>

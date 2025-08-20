@@ -545,3 +545,241 @@ function activateSection(id) {
     window.location.href = '/admin/login';
   }
 })();
+
+
+  const editDialog = $('#editDialog');
+  const editForm = $('#editForm');
+  const createRewardDialog = $('#createRewardDialog');
+  const createRewardForm = $('#createRewardForm');
+  const editRewardDialog = $('#editRewardDialog');
+  const editRewardForm = $('#editRewardForm');
+  const confirmDialog = $('#confirmDialog');
+  const confirmForm = $('#confirmForm');
+  const toast = $('#toast');
+
+  let state = {
+    users: [],
+    rewards: [],
+    userToDelete: null,
+    rewardToDelete: null,
+    userToEdit: null,
+    rewardToEdit: null,
+    pagination: { page: 1, limit: 10, total: 0, pages: 1 },
+    filters: { search: '', sort: 'createdAt', order: 'desc' },
+  };
+
+  function showToast(message, type = 'success') {
+    $('#toast').textContent = message || '';
+    $('#toast').className = `toast${isErr ? ' error' : ''}`;
+    requestAnimationFrame(() => t.classList.add('show'));
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  function render() {
+    renderUsers();
+    renderPagination();
+    renderRewards();
+  }
+
+  function renderUsers() {
+    $('#usersTableBody').innerHTML = state.users.map(userRow).join('');
+  }
+
+  function renderRewards() {
+    const rewardRow = (reward) => `
+      <tr>
+        <td>${escapeHTML(reward.name)}</td>
+        <td>${reward.probability}%</td>
+        <td><img src="${escapeHTML(reward.imageUrl || '')}" alt="${escapeHTML(reward.name)}" style="width: 50px; height: 50px; object-fit: cover;"></td>
+        <td>
+          <button class="btn-icon edit-reward" data-id="${reward._id}" title="Edit"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
+          <button class="btn-icon delete-reward" data-id="${reward._id}" title="Delete"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
+        </td>
+      </tr>
+    `;
+    $('#rewardsTableBody').innerHTML = state.rewards.map(rewardRow).join('');
+  }
+
+  async function fetchUsers() {
+    try {
+      state.users = await api('/api/admin/users');
+      render();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  async function fetchRewards() {
+    try {
+      state.rewards = await api('/api/rewards');
+      render();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  function handleAddClick() {
+    $('#createDialog').showModal();
+  }
+
+  function handleAddRewardClick() {
+    createRewardForm.reset();
+    createRewardDialog.showModal();
+  }
+
+  async function handleCreateForm(e) {
+    e.preventDefault();
+    const name = $('#cName').value;
+    const email = $('#cEmail').value;
+    const password = $('#cPassword').value;
+    const role = $('#cRole').value;
+    await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ name, email, password, role }) });
+    $('#createDialog').close();
+    await fetchUsers();
+    showToast('User created successfully');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+  }
+
+  async function handleCreateRewardForm(e) {
+    e.preventDefault();
+    const name = $('#createRewardName').value;
+    const description = $('#createRewardDescription').value;
+    const imageUrl = $('#createRewardImageUrl').value;
+    const probability = parseFloat($('#createRewardProbability').value);
+
+    try {
+      await api('/api/rewards', {
+        method: 'POST',
+        body: JSON.stringify({ name, description, imageUrl, probability }),
+      });
+      createRewardDialog.close();
+      await fetchRewards();
+      showToast('Reward created successfully');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  function handleTableClick(e) {
+    if (e.target.closest('.delete-user')) {
+      const id = e.target.closest('.delete-user').dataset.id;
+      state.userToDelete = id;
+      $('#confirmDialog .dialog-form h2').textContent = 'Delete User';
+      $('#confirmDialog .dialog-form p').textContent = 'Are you sure you want to delete this user? This action cannot be undone.';
+      confirmDialog.showModal();
+    } else if (e.target.closest('.edit-user')) {
+      const id = e.target.closest('.edit-user').dataset.id;
+      state.userToEdit = state.users.find(u => u._id === id);
+      if (state.userToEdit) {
+        $('#editUserId').value = state.userToEdit._id;
+        $('#editName').value = state.userToEdit.name;
+        $('#editEmail').value = state.userToEdit.email;
+        $('#editRole').value = state.userToEdit.role;
+        $('#editActive').checked = state.userToEdit.active;
+        editDialog.showModal();
+      }
+    } else if (e.target.closest('.delete-reward')) {
+      const id = e.target.closest('.delete-reward').dataset.id;
+      state.rewardToDelete = id;
+      $('#confirmDialog .dialog-form h2').textContent = 'Delete Reward';
+      $('#confirmDialog .dialog-form p').textContent = 'Are you sure you want to delete this reward?';
+      confirmDialog.showModal();
+    } else if (e.target.closest('.edit-reward')) {
+      const id = e.target.closest('.edit-reward').dataset.id;
+      state.rewardToEdit = state.rewards.find(r => r._id === id);
+      if (state.rewardToEdit) {
+        $('#editRewardId').value = state.rewardToEdit._id;
+        $('#editRewardName').value = state.rewardToEdit.name;
+        $('#editRewardDescription').value = state.rewardToEdit.description;
+        $('#editRewardImageUrl').value = state.rewardToEdit.imageUrl;
+        $('#editRewardProbability').value = state.rewardToEdit.probability;
+        editRewardDialog.showModal();
+      }
+    }
+  }
+
+  async function handleEditForm(e) {
+    e.preventDefault();
+    const id = $('#eId').value;
+    const name = $('#eName').value;
+    const email = $('#eEmail').value;
+    const role = $('#eRole').value;
+    const active = $('#eActive').value === 'true',
+    await api(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+    $('#editDialog').close();
+    await refreshUsers();
+    showToast('User updated successfully');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+  }
+
+  async function handleEditRewardForm(e) {
+    e.preventDefault();
+    const id = $('#editRewardId').value;
+    const name = $('#editRewardName').value;
+    const description = $('#editRewardDescription').value;
+    const imageUrl = $('#editRewardImageUrl').value;
+    const probability = parseFloat($('#editRewardProbability').value);
+
+    try {
+      await api(`/api/rewards/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name, description, imageUrl, probability }),
+      });
+      editRewardDialog.close();
+      await fetchRewards();
+      showToast('Reward updated successfully');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  async function handleConfirmForm(e) {
+    e.preventDefault();
+    if (state.userToDelete) {
+      try {
+        await api(`/api/admin/users/${state.userToDelete}`, { method: 'DELETE' });
+        confirmDialog.close();
+        await fetchUsers();
+        showToast('User deleted successfully');
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        state.userToDelete = null;
+      }
+    } else if (state.rewardToDelete) {
+      try {
+        await api(`/api/rewards/${state.rewardToDelete}`, { method: 'DELETE' });
+        confirmDialog.close();
+        await fetchRewards();
+        showToast('Reward deleted successfully');
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        state.rewardToDelete = null;
+      }
+    }
+  }
+
+  function handleSearch(e) {
+    fetchUsers();
+  }
+
+  function init() {
+    // Nav
+    $('#usersTableBody').addEventListener('click', handleTableClick);
+    $('#rewardsTableBody').addEventListener('click', handleTableClick);
+
+    // Filters
+    $('#searchInput').addEventListener('input', debounce(handleSearch, 300));
+
+    // Initial data fetch
+    fetchUsers();
+    fetchRewards();
+  }
+
+  init();
+})();
