@@ -189,9 +189,10 @@ async function refreshUsers() {
         <td>${u.active ? 'true' : 'false'}</td>
         <td>${new Date(u.createdAt).toLocaleString()}</td>
         <td>
-          <button class="btn btn-secondary" data-action="edit" data-id="${u.id}">Edit</button>
-          <button class="btn" data-action="delete" data-id="${u.id}">Delete</button>
-        </td>`;
+          <button class="btn btn-secondary" data-action="edit" data-id="${u._id || u.id}">Edit</button>
+          <button class="btn" data-action="delete" data-id="${u._id || u.id}">Delete</button>
+        </td>
+      `;
       tbody.appendChild(tr);
     });
   } catch (err) {
