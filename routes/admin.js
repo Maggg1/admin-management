@@ -148,6 +148,8 @@ router.patch(
 // DELETE /api/admin/users/:id - delete user with last-admin safeguard
 router.delete(
   '/users/:id',
+  authenticate,
+  authorize('admin'),
   [param('id').custom((v) => mongoose.Types.ObjectId.isValid(v)).withMessage('Invalid ID')],
   handleValidation,
   async (req, res) => {
