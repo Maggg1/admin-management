@@ -241,10 +241,12 @@ $('#createForm').addEventListener('submit', async (e) => {
   }
 });
 
-// Handle cancel button
+// Handle cancel button - prevent form validation
 document.querySelector('#createDialog .btn-secondary').addEventListener('click', (e) => {
   e.preventDefault();
+  e.stopPropagation();
   $('#createDialog').close();
+  return false;
 });
 
 // Edit/Delete via delegation
@@ -317,7 +319,9 @@ $('#editForm').addEventListener('submit', async (e) => {
 // Handle edit dialog cancel button
 document.querySelector('#editDialog .btn-secondary').addEventListener('click', (e) => {
   e.preventDefault();
+  e.stopPropagation();
   $('#editDialog').close();
+  return false;
 });
 
 // Feedback section
