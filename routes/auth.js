@@ -66,23 +66,12 @@ router.post(
   handleValidation,
   async (req, res) => {
     try {
-      const { name, email, password } = req.body;
-      const user = new User({ name, email, password, role: 'user', active: true });
-      await user.save();
-
-      const token = signToken(user);
-      const safeUser = {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        active: user.active,
-      };
-      return res.status(201).json({ token, user: safeUser });
+      // **DISABLE NORMAL USER REGISTRATION** - Admin-only system
+      return res.status(403).json({ 
+        message: 'User registration is disabled. Only admin users can be created by existing admins.',
+        debug: process.env.NODE_ENV === 'development' ? 'Admin-only system' : undefined
+      });
     } catch (err) {
-      if (err?.code === 11000) {
-        return res.status(409).json({ message: 'Email already in use' });
-      }
       console.error('register error:', err);
       return res.status(500).json({ message: 'Internal server error' });
     }
@@ -101,11 +90,11 @@ router.post(
       const { email, password } = req.body;
       
       // Enhanced logging for debugging
-      console.log(`🔐 Login attempt for email: ${email}`);
+      console.log(`🔐 Admin login attempt for email: ${email}`);
       
       const user = await User.findOne({ email }).select('+password');
       if (!user) {
-        console.log(`❌ Login failed: User not found for email: ${email}`);
+        console.log(`❌ Admin login failed: User not found for email: ${email}`);
         return res.status(401).json({ 
           message: 'Invalid credentials',
           debug: process.env.NODE_ENV === 'development' ? 'User not found' : undefined
@@ -113,16 +102,25 @@ router.post(
       }
       
       if (!user.active) {
-        console.log(`❌ Login failed: User account disabled for email: ${email}`);
+        console.log(`❌ Admin login failed: User account disabled for email: ${email}`);
         return res.status(403).json({ 
           message: 'User is disabled',
           debug: process.env.NODE_ENV === 'development' ? 'Account inactive' : undefined
         });
       }
 
+      // **ADMIN-ONLY LOGIN** - Reject non-admin users
+      if (user.role !== 'admin') {
+        console.log(`❌ Admin login failed: Non-admin user attempted login for email: ${email}`);
+        return res.status(403).json({ 
+          message: 'Access denied. Admin privileges required.',
+          debug: process.env.NODE_ENV === 'development' ? 'Non-admin user' : undefined
+        });
+      }
+
       const match = await user.comparePassword(password);
       if (!match) {
-        console.log(`❌ Login failed: Invalid password for email: ${email}`);
+        console.log(`❌ Admin login failed: Invalid password for email: ${email}`);
         return res.status(401).json({ 
           message: 'Invalid credentials',
           debug: process.env.NODE_ENV === 'development' ? 'Password mismatch' : undefined
@@ -138,10 +136,10 @@ router.post(
         active: user.active,
       };
       
-      console.log(`✅ Login successful for email: ${email}`);
+      console.log(`✅ Admin login successful for email: ${email}`);
       return res.json({ token, user: safeUser });
     } catch (err) {
-      console.error('🔥 Login error:', err);
+      console.error('🔥 Admin login error:', err);
       return res.status(500).json({ 
         message: 'Internal server error',
         debug: process.env.NODE_ENV === 'development' ? err.message : undefined
