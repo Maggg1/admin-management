@@ -783,3 +783,201 @@ function activateSection(id) {
 
   init();
 })();
+
+
+function debounce(fn, ms=300) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+function escapeHTML(str) {
+  const p = document.createElement('p');
+  p.appendChild(document.createTextNode(str));
+  return p.innerHTML;
+}
+
+// Logout
+$('#btnLogout').addEventListener('click', () => {
+  $('#deleteDialog').showModal();
+  $('#deleteDialog').dataset.id = id;
+  $('#deleteDialog').dataset.type = 'user';
+});
+
+$('#usersTbody').addEventListener('click', async (e) => {
+  const target = e.target;
+  const action = target.dataset.action;
+  const id = target.dataset.id;
+
+  if (action === 'edit') {
+    try {
+      const user = await api(`/api/admin/users/${id}`);
+      $('#editUserId').value = user._id;
+      $('#editName').value = user.name;
+      $('#editEmail').value = user.email;
+      $('#editRole').value = user.role;
+      $('#editActive').checked = user.active;
+      $('#editUserDialog').showModal();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  } else if (action === 'delete') {
+    $('#deleteDialog').showModal();
+    $('#deleteDialog').dataset.id = id;
+    $('#deleteDialog').dataset.type = 'user';
+  }
+});
+
+$('#rewardsTbody').addEventListener('click', async (e) => {
+  const target = e.target;
+  const action = target.dataset.action;
+  const id = target.dataset.id;
+
+  if (action === 'edit-reward') {
+    try {
+      const reward = await api(`/api/rewards/${id}`);
+      $('#editRewardId').value = reward._id;
+      $('#editRewardName').value = reward.name;
+      $('#editRewardDescription').value = reward.description;
+      $('#editRewardImageUrl').value = reward.imageUrl;
+      $('#editRewardProbability').value = reward.probability;
+      $('#editRewardDialog').showModal();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  } else if (action === 'delete-reward') {
+    $('#deleteDialog').showModal();
+    $('#deleteDialog').dataset.id = id;
+    $('#deleteDialog').dataset.type = 'reward';
+  }
+});
+
+$('#addUserBtn').addEventListener('click', () => {
+  $('#addUserDialog').showModal();
+});
+
+$('#addRewardBtn').addEventListener('click', () => {
+  $('#addRewardDialog').showModal();
+});
+
+$('#addUserForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = $('#addName').value;
+  const email = $('#addEmail').value;
+  const password = $('#addPassword').value;
+  const role = $('#addRole').value;
+  try {
+    await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ name, email, password, role }) });
+    $('#addUserDialog').close();
+    await refreshUsers();
+    toast('User created successfully');
+  } catch (err) {
+    toast(err.message, true);
+  }
+});
+
+$('#addRewardForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = $('#addRewardName').value;
+  const description = $('#addRewardDescription').value;
+  const imageUrl = $('#addRewardImageUrl').value;
+  const probability = parseFloat($('#addRewardProbability').value);
+  try {
+    await api('/api/rewards', { method: 'POST', body: JSON.stringify({ name, description, imageUrl, probability }) });
+    $('#addRewardDialog').close();
+    await refreshRewards();
+    toast('Reward created successfully');
+  } catch (err) {
+    toast(err.message, true);
+  }
+});
+
+$('#editUserForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = $('#editUserId').value;
+  const name = $('#editName').value;
+  const email = $('#editEmail').value;
+  const role = $('#editRole').value;
+  const active = $('#editActive').checked;
+  try {
+    await api(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify({ name, email, role, active }) });
+    $('#editUserDialog').close();
+    await refreshUsers();
+    toast('User updated successfully');
+  } catch (err) {
+    toast(err.message, true);
+  }
+});
+
+$('#editRewardForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = $('#editRewardId').value;
+  const name = $('#editRewardName').value;
+  const description = $('#editRewardDescription').value;
+  const imageUrl = $('#editRewardImageUrl').value;
+  const probability = parseFloat($('#editRewardProbability').value);
+  try {
+    await api(`/api/rewards/${id}`, { method: 'PUT', body: JSON.stringify({ name, description, imageUrl, probability }) });
+    $('#editRewardDialog').close();
+    await refreshRewards();
+    toast('Reward updated successfully');
+  } catch (err) {
+    toast(err.message, true);
+  }
+});
+
+$('#deleteForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = $('#deleteDialog').dataset.id;
+  const type = $('#deleteDialog').dataset.type;
+  try {
+    if (type === 'user') {
+      await api(`/api/admin/users/${id}`, { method: 'DELETE' });
+      await refreshUsers();
+      toast('User deleted successfully');
+    } else if (type === 'reward') {
+      await api(`/api/rewards/${id}`, { method: 'DELETE' });
+      await refreshRewards();
+      toast('Reward deleted successfully');
+    }
+    $('#deleteDialog').close();
+  } catch (err) {
+    toast(err.message, true);
+  }
+});
+
+
+// Search and filter handlers
+const debouncedRefresh = debounce(refreshUsers, 300);
+$('#searchInput').addEventListener('input', debouncedRefresh);
+$('#limit').addEventListener('change', () => { state.page = 1; refreshUsers(); });
+$('#sortField').addEventListener('change', refreshUsers);
+$('#sortOrder').addEventListener('change', refreshUsers);
+$('#prevPage').addEventListener('click', () => { if (state.page > 1) { state.page--; refreshUsers(); } });
+$('#nextPage').addEventListener('click', () => { state.page++; refreshUsers(); });
+
+
+async function init() {
+  setAuth(getToken());
+  const user = await ensureUserLoaded();
+  if (!user) {
+    window.location.href = '/admin/login';
+    return;
+  }
+  if (user.role !== 'admin') {
+    alert('Access denied. You must be an admin to view this page.');
+    window.location.href = '/admin/login';
+    return;
+  }
+
+  $('#dashboardNav').hidden = false;
+  activateSection('usersSection');
+  await refreshUsers();
+  await refreshRewards();
+}
+
+init().catch(err => {
+  console.error('Init failed', err);
+  toast(err.message, true);
+  setAuth(null);
+  // window.location.href = '/admin/login';
+});
