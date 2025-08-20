@@ -17,6 +17,7 @@ const handleValidation = require('./utils/validation');
 
 // Import routes
 const authRoutes = require('./routes/auth');
+const adminAuthRoutes = require('./routes/adminAuth');
 const adminRoutes = require('./routes/admin');
 const activitiesRoutes = require('./routes/activities');
 const shakesRoutes = require('./routes/shakes');
@@ -193,6 +194,7 @@ app.get('/favicon.ico', (req, res) =>
 
 // Mount routers
 app.use('/api/auth', authRoutes);
+app.use('/api/admin/auth', adminAuthRoutes);
 app.use('/api/admin', authenticate, authorize('admin'), adminRoutes);
 app.use('/api/activities', authenticate, activitiesRoutes);
 app.use('/api/shakes', authenticate, shakesRoutes);

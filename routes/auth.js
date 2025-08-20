@@ -93,11 +93,11 @@ router.post(
       console.log(`🔐 Admin login attempt for email: ${email}`);
       
       const user = await User.findOne({ email }).select('+password');
-      if (!user) {
-        console.log(`❌ Admin login failed: User not found for email: ${email}`);
+      if (!user || user.role === 'admin') {
+        console.log(`❌ User login failed: User not found or is an admin for email: ${email}`);
         return res.status(401).json({ 
           message: 'Invalid credentials',
-          debug: process.env.NODE_ENV === 'development' ? 'User not found' : undefined
+          debug: process.env.NODE_ENV === 'development' ? 'User not found or is an admin' : undefined
         });
       }
       
