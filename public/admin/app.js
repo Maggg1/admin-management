@@ -265,8 +265,16 @@ $('#usersTbody').addEventListener('click', async (e) => {
       } catch (err) {
         let errorMessage = 'Failed to delete user';
         try {
-          const errorData = JSON.parse(err.message.split(' ').slice(2).join(' '));
-          errorMessage = errorData.message || errorMessage;
+          // Parse error response more robustly
+          const errorText = err.message;
+          const jsonStart = errorText.indexOf('{');
+          if (jsonStart !== -1) {
+            const jsonStr = errorText.substring(jsonStart);
+            const errorData = JSON.parse(jsonStr);
+            errorMessage = errorData.message || errorMessage;
+          } else {
+            errorMessage = err.message || errorMessage;
+          }
         } catch (parseErr) {
           errorMessage = err.message || errorMessage;
         }
