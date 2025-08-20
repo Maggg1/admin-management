@@ -220,6 +220,7 @@ $('#btnShowCreate').addEventListener('click', () => {
   $('#createDialog').showModal();
 });
 
+// Handle form submission and cancel
 $('#createForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   setMsg($('#createMsg'), '');
@@ -238,6 +239,11 @@ $('#createForm').addEventListener('submit', async (e) => {
     setMsg($('#createMsg'), err.message, true);
     toast(err.message, true);
   }
+});
+
+// Handle cancel button
+document.querySelector('#createDialog .btn-secondary').addEventListener('click', () => {
+  $('#createDialog').close();
 });
 
 // Edit/Delete via delegation
@@ -305,6 +311,11 @@ $('#editForm').addEventListener('submit', async (e) => {
     setMsg($('#editMsg'), err.message, true);
     toast(err.message, true);
   }
+});
+
+// Handle edit dialog cancel button
+document.querySelector('#editDialog .btn-secondary').addEventListener('click', () => {
+  $('#editDialog').close();
 });
 
 // Feedback section
