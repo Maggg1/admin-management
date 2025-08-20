@@ -175,14 +175,59 @@ router.delete(
         return res.status(400).json({ message: 'Cannot delete your own account' });
       }
 
-      await User.deleteOne({ _id: req.params.id });
-      console.log(`User deleted successfully: ${req.params.id}`);
-      return res.json({ success: true, message: 'User deleted successfully' });
+      // Check for foreign key references and handle them
+      try {
+        // Check if user has activities
+        const activityCount = await Activity.countDocuments({ user: req.params.id });
+        if (activityCount > 0) {
+          console.log(`User ${req.params.id} has ${activityCount} activities, deleting them...`);
+          await Activity.deleteMany({ user: req.params.id });
+        }
+
+        // Check if user has feedback
+        const feedbackCount = await Feedback.countDocuments({ user: req.params.id });
+        if (feedbackCount > 0) {
+          console.log(`User ${req.params.id} has ${feedbackCount} feedback entries, deleting them...`);
+          await Feedback.deleteMany({ user: req.params.id });
+        }
+
+        // Check if user has rewards (as owner or participant)
+        const rewardCount = await Reward.countDocuments({ user: req.params.id });
+        if (rewardCount > 0) {
+          console.log(`User ${req.params.id} has ${rewardCount} rewards, deleting them...`);
+          await Reward.deleteMany({ user: req.params.id });
+        }
+
+        // Now delete the user
+        await User.deleteOne({ _id: req.params.id });
+        console.log(`User deleted successfully: ${req.params.id}`);
+        return res.json({ success: true, message: 'User deleted successfully' });
+        
+      } catch (deleteError) {
+        console.error('Error during user deletion cascade:', deleteError);
+        
+        // If cascade deletion fails, try a safer approach
+        if (deleteError.code === 11000 || deleteError.name === 'MongoError') {
+          return res.status(400).json({ 
+            message: 'Cannot delete user: user is referenced in other records. Please contact support.' 
+          });
+        }
+        
+        throw deleteError;
+      }
     } catch (err) {
       console.error('delete user error:', err);
+      
       if (err.name === 'CastError') {
         return res.status(400).json({ message: 'Invalid user ID format' });
       }
+      
+      if (err.code === 11000) {
+        return res.status(400).json({ 
+          message: 'Cannot delete user due to data integrity constraints' 
+        });
+      }
+      
       return res.status(500).json({ message: 'Internal server error' });
     }
   }

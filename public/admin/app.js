@@ -257,12 +257,12 @@ $('#usersTbody').addEventListener('click', async (e) => {
   const id = btn.dataset.id;
   const action = btn.dataset.action;
   if (action === 'delete') {
-    const confirmed = await confirmDialog('Delete this user?');
+    const confirmed = await confirmDialog('Delete this user? This will also delete all associated activities, feedback, and rewards.');
     if (!confirmed) return;
       try {
         await api(`/api/admin/users/${id}`, { method: 'DELETE' });
         await refreshUsers();
-        toast('User deleted');
+        toast('User deleted successfully');
       } catch (err) {
         let errorMessage = 'Failed to delete user';
         try {
