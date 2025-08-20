@@ -242,7 +242,8 @@ $('#createForm').addEventListener('submit', async (e) => {
 });
 
 // Handle cancel button
-document.querySelector('#createDialog .btn-secondary').addEventListener('click', () => {
+document.querySelector('#createDialog .btn-secondary').addEventListener('click', (e) => {
+  e.preventDefault();
   $('#createDialog').close();
 });
 
@@ -314,7 +315,8 @@ $('#editForm').addEventListener('submit', async (e) => {
 });
 
 // Handle edit dialog cancel button
-document.querySelector('#editDialog .btn-secondary').addEventListener('click', () => {
+document.querySelector('#editDialog .btn-secondary').addEventListener('click', (e) => {
+  e.preventDefault();
   $('#editDialog').close();
 });
 
