@@ -4,7 +4,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const createDialog = document.getElementById('createDialog');
   const createCancelBtn = document.querySelector('#createDialog .btn-secondary');
   if (createCancelBtn && createCancelBtn.textContent === 'Cancel') {
-    createCancelBtn.addEventListener('click', function() {
+    createCancelBtn.addEventListener('click', function(e) {
+      e.preventDefault();
       createDialog.close();
     });
   }
@@ -13,7 +14,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const editDialog = document.getElementById('editDialog');
   const editCancelBtn = document.querySelector('#editDialog .btn-secondary');
   if (editCancelBtn && editCancelBtn.textContent === 'Cancel') {
-    editCancelBtn.addEventListener('click', function() {
+    editCancelBtn.addEventListener('click', function(e) {
+      e.preventDefault();
       editDialog.close();
     });
   }
@@ -22,7 +24,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const createRewardDialog = document.getElementById('createRewardDialog');
   const createRewardCancelBtn = document.querySelector('#createRewardDialog .btn-secondary');
   if (createRewardCancelBtn && createRewardCancelBtn.textContent === 'Cancel') {
-    createRewardCancelBtn.addEventListener('click', function() {
+    createRewardCancelBtn.addEventListener('click', function(e) {
+      e.preventDefault();
       createRewardDialog.close();
     });
   }
@@ -31,7 +34,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const editRewardDialog = document.getElementById('editRewardDialog');
   const editRewardCancelBtn = document.querySelector('#editRewardDialog .btn-secondary');
   if (editRewardCancelBtn && editRewardCancelBtn.textContent === 'Cancel') {
-    editRewardCancelBtn.addEventListener('click', function() {
+    editRewardCancelBtn.addEventListener('click', function(e) {
+      e.preventDefault();
       editRewardDialog.close();
     });
   }
