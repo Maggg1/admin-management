@@ -133,7 +133,7 @@
       try{
         const email = $('#loginEmail').value.trim();
         const password = $('#loginPassword').value;
-        const { token } = await api('/api/auth/login', { method:'POST', body: JSON.stringify({ email, password }) });
+        const { token } = await api('/api/admin/auth/login', { method:'POST', body: JSON.stringify({ email, password }) });
         localStorage.setItem(STORAGE_KEY, token);
         location.href = '/admin/';
       }catch(err){ $('#loginMsg').textContent = err.message; $('#loginMsg').className='msg error'; }
