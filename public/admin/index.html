@@ -279,7 +279,7 @@
             </select>
           </label>
           <menu>
-            <button value="cancel" class="btn btn-secondary">Cancel</button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('createDialog').close()">Cancel</button>
             <button value="default" class="btn btn-primary">Create</button>
           </menu>
           <div id="createMsg" class="msg"></div>
@@ -308,7 +308,7 @@
             </select>
           </label>
           <menu>
-            <button value="cancel" class="btn btn-secondary">Cancel</button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('editDialog').close()">Cancel</button>
             <button value="default" class="btn btn-primary">Save</button>
           </menu>
           <div id="editMsg" class="msg"></div>
