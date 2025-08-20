@@ -19,19 +19,9 @@ const handleValidation = require('./utils/validation');
 const authRoutes = require('./routes/auth');
 const adminAuthRoutes = require('./routes/adminAuth');
 const adminRoutes = require('./routes/admin');
-const activitiesRoutes = require('./routes/activities');
-const shakesRoutes = require('./routes/shakes');
-const feedbacksRoutes = require('./routes/feedbacks');
-const usersRoutes = require('./routes/users');
-const rewardsRoutes = require('./routes/rewards');
+const userRoutes = require('./routes/users');
+const rewardRoutes = require('./routes/rewards');
 
-// Import models
-const User = require('./models/User');
-const Activity = require('./models/Activity');
-const Feedback = require('./models/Feedback');
-const Reward = require('./models/Reward');
-
-// App setup
 const app = express();
 
 // Configuration
@@ -140,9 +130,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(sanitizeInput);
 app.use(morgan('dev'));
 
-// Global API rate limiting
-
-
 // Static admin client
 app.use('/admin', express.static('public/admin'));
 
@@ -195,12 +182,13 @@ app.get('/favicon.ico', (req, res) =>
 // Mount routers
 app.use('/api/auth', authRoutes);
 app.use('/api/admin/auth', adminAuthRoutes);
-app.use('/api/admin', authenticate, authorize('admin'), adminRoutes);
-app.use('/api/activities', authenticate, activitiesRoutes);
-app.use('/api/shakes', authenticate, shakesRoutes);
-app.use('/api/feedbacks', authenticate, feedbacksRoutes);
-app.use('/api/users', authenticate, usersRoutes);
-app.use('/api/rewards', authenticate, rewardsRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/rewards', rewardRoutes);
+
+// Serve Admin UI static files
+app.use('/admin', express.static(path.join(__dirname, 'public', 'admin')));
+app.use('/api/rewards', rewardRoutes);
 
 // Error handling middleware
 app.use(errorHandler);
