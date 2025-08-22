@@ -23,12 +23,16 @@ This guide explains how to separate your backend into two distinct systems:
 ### Start Both Backends
 
 ```bash
+# Option 1: Run both backends simultaneously
+npm run dev:both
+
+# Option 2: Run separately
 # Terminal 1: Admin Backend
-node index-admin.js
+npm run dev:admin
 # Runs on http://localhost:4000
 
 # Terminal 2: User Backend  
-node index-user.js
+npm run dev:user
 # Runs on http://localhost:4001
 ```
 

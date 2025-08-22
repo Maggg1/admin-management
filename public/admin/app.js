@@ -4,10 +4,11 @@ const API_BASE = '';
 const STORAGE_KEY = 'admin_backend_token';
 const USER_KEY = 'admin_backend_user';
 
+// Utility functions
 function $(sel, ctx = document) { return ctx.querySelector(sel); }
 function $all(sel, ctx = document) { return Array.from(ctx.querySelectorAll(sel)); }
 
-function toast(msg, isErr=false) {
+function toast(msg, isErr = false) {
   const t = $('#toast');
   t.textContent = msg || '';
   t.className = `toast${isErr ? ' error' : ''}`;
@@ -41,6 +42,7 @@ function authHeaders() {
 function getStoredUser() { try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null'); } catch { return null; } }
 function setStoredUser(u) { if (u) localStorage.setItem(USER_KEY, JSON.stringify(u)); else localStorage.removeItem(USER_KEY); }
 function decodeJwt(token) { try { const p = token.split('.')[1]; return JSON.parse(atob(p)); } catch { return null; } }
+
 async function ensureUserLoaded() {
   const token = getToken();
   if (!token) return null;
@@ -78,6 +80,73 @@ function setMsg(el, msg, isErr = false) {
   el.style.color = isErr ? '#f87171' : '#a3e635';
 }
 
+// Debounce helper
+function debounce(fn, ms = 300) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+// Theme management
+function initTheme() {
+  const THEME_KEY = 'admin_theme';
+  const themeToggle = $('#themeToggle');
+  
+  function applyTheme(mode) {
+    document.documentElement.classList.toggle('theme-light', mode === 'light');
+    document.documentElement.classList.toggle('theme-dark', mode === 'dark');
+    localStorage.setItem(THEME_KEY, mode);
+    if (themeToggle) {
+      themeToggle.checked = mode === 'dark';
+    }
+  }
+  
+  function toggleTheme() {
+    const current = localStorage.getItem(THEME_KEY) || 'light';
+    const newMode = current === 'light' ? 'dark' : 'light';
+    applyTheme(newMode);
+  }
+  
+  // Initialize theme
+  const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
+  applyTheme(savedTheme);
+  
+  // Set up event listener
+  if (themeToggle) {
+    themeToggle.addEventListener('change', toggleTheme);
+  }
+}
+
+// Section activation
+function activateSection(id) {
+  ['usersSection', 'feedbackSection', 'shakesSection', 'rewardsSection', 'settingsSection'].forEach(sec => {
+    const node = document.getElementById(sec);
+    if (node) node.hidden = true;
+  });
+  const target = document.getElementById(id);
+  if (target) target.hidden = false;
+  
+  document.querySelectorAll('.navbtn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.target === id);
+  });
+  
+  // Sync theme toggle when settings section is opened
+  if (id === 'settingsSection') {
+    initTheme();
+  }
+}
+
+// Confirmation dialog
+async function confirmDialog(text) {
+  $('#confirmText').textContent = text || 'Are you sure?';
+  $('#confirmDialog').showModal();
+  return new Promise((resolve) => {
+    const ok = $('#confirmOk');
+    const handler = (e) => { $('#confirmDialog').close(); ok.removeEventListener('click', handler); resolve(e.target === ok); };
+    ok.addEventListener('click', handler, { once: true });
+    $('#confirmDialog').addEventListener('close', () => resolve(false), { once: true });
+  });
+}
+
 // Tabs for auth
 $all('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -87,12 +156,6 @@ $all('.tab').forEach(btn => {
     $('#' + btn.dataset.tab).classList.add('active');
   });
 });
-
-// Debounce helper
-function debounce(fn, ms=300) {
-  let t;
-  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-}
 
 // Logout
 $('#btnLogout').addEventListener('click', () => {
@@ -143,25 +206,8 @@ $('#registerForm').addEventListener('submit', async (e) => {
   }
 });
 
-// Users list
+// Users section
 let state = { page: 1 };
-
-function activateSection(id) {
-  ['usersSection','feedbackSection','shakesSection','rewardsSection'].forEach(sec => hide(document.getElementById(sec)));
-  show(document.getElementById(id));
-  $all('.navbtn').forEach(b => b.classList.toggle('active', b.dataset.target === id));
-}
-
-// Dashboard nav handlers
-$all('.navbtn').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    activateSection(btn.dataset.target);
-    if (btn.dataset.target === 'usersSection') await refreshUsers();
-    if (btn.dataset.target === 'feedbackSection') await refreshFeedback();
-    if (btn.dataset.target === 'shakesSection') await refreshShakes();
-    if (btn.dataset.target === 'rewardsSection') await refreshRewards();
-  });
-});
 
 async function refreshUsers() {
   $('#usersLoader').hidden = false;
@@ -211,7 +257,7 @@ $('#limit').addEventListener('change', () => { state.page = 1; refreshUsers(); }
 $('#prevPage').addEventListener('click', () => { state.page = Math.max(1, (state.page || 1) - 1); refreshUsers(); });
 $('#nextPage').addEventListener('click', () => { state.page = (state.page || 1) + 1; refreshUsers(); });
 
-// Create
+// Create user
 $('#btnShowCreate').addEventListener('click', () => {
   $('#createMsg').textContent = '';
   $('#cName').value = '';
@@ -221,7 +267,6 @@ $('#btnShowCreate').addEventListener('click', () => {
   $('#createDialog').showModal();
 });
 
-// Handle form submission and cancel
 $('#createForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   setMsg($('#createMsg'), '');
@@ -250,39 +295,40 @@ document.querySelector('#createDialog .btn-secondary').addEventListener('click',
   return false;
 });
 
-// Edit/Delete via delegation
+// Edit/Delete user via delegation
 $('#usersTbody').addEventListener('click', async (e) => {
   const btn = e.target.closest('button[data-action]');
   if (!btn) return;
   const id = btn.dataset.id;
   const action = btn.dataset.action;
+  
   if (action === 'delete') {
     const confirmed = await confirmDialog('Delete this user? This will also delete all associated activities, feedback, and rewards.');
     if (!confirmed) return;
+    try {
+      await api(`/api/admin/users/${id}`, { method: 'DELETE' });
+      await refreshUsers();
+      toast('User deleted successfully');
+    } catch (err) {
+      let errorMessage = 'Failed to delete user';
       try {
-        await api(`/api/admin/users/${id}`, { method: 'DELETE' });
-        await refreshUsers();
-        toast('User deleted successfully');
-      } catch (err) {
-        let errorMessage = 'Failed to delete user';
-        try {
-          // Parse error response more robustly
-          const errorText = err.message;
-          const jsonStart = errorText.indexOf('{');
-          if (jsonStart !== -1) {
-            const jsonStr = errorText.substring(jsonStart);
-            const errorData = JSON.parse(jsonStr);
-            errorMessage = errorData.message || errorMessage;
-          } else {
-            errorMessage = err.message || errorMessage;
-          }
-        } catch (parseErr) {
+        const errorText = err.message;
+        const jsonStart = errorText.indexOf('{');
+        if (jsonStart !== -1) {
+          const jsonStr = errorText.substring(jsonStart);
+          const errorData = JSON.parse(jsonStr);
+          errorMessage = errorData.message || errorMessage;
+        } else {
           errorMessage = err.message || errorMessage;
         }
-        setMsg($('#usersMsg'), errorMessage, true);
-        toast(errorMessage, true);
+      } catch (parseErr) {
+        errorMessage = err.message || errorMessage;
       }
+      setMsg($('#usersMsg'), errorMessage, true);
+      toast(errorMessage, true);
+    }
   }
+  
   if (action === 'edit') {
     try {
       const u = await api(`/api/admin/users/${id}`);
@@ -356,6 +402,7 @@ async function refreshFeedback() {
     toast(err.message, true);
   } finally { $('#fbLoader').hidden = true; }
 }
+
 $('#fbRefresh').addEventListener('click', () => { fbState.page=1; refreshFeedback(); });
 $('#fbSearch').addEventListener('input', debounce(() => { fbState.page=1; refreshFeedback(); }, 350));
 $('#fbLimit').addEventListener('change', () => { fbState.page=1; refreshFeedback(); });
@@ -385,6 +432,7 @@ async function refreshShakes() {
     toast(err.message, true);
   } finally { $('#shLoader').hidden = true; }
 }
+
 $('#shRefresh').addEventListener('click', () => { shState.page=1; refreshShakes(); });
 $('#shSearch').addEventListener('input', debounce(() => { shState.page=1; refreshShakes(); }, 350));
 $('#shLimit').addEventListener('change', () => { shState.page=1; refreshShakes(); });
@@ -399,12 +447,20 @@ async function refreshRewards() {
     const tbody = $('#rewardsTbody');
     tbody.innerHTML = '';
     const arr = (data.data||data||[]);
-    if (!arr.length) tbody.innerHTML = '<tr class="muted"><td colspan="5">No rewards yet</td></tr>';
+    if (!arr.length) tbody.innerHTML = '<tr class="muted"><td colspan="6">No rewards yet</td></tr>';
     arr.forEach(r => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${r.title||''}</td><td>${r.points??''}</td><td>${r.active?'true':'false'}</td><td>${new Date(r.createdAt).toLocaleString()}</td>
-        <td><button class="btn btn-secondary" data-action="edit-reward" data-id="${r.id||r._id}">Edit</button>
-        <button class="btn" data-action="delete-reward" data-id="${r.id||r._id}">Delete</button></td>`;
+      tr.innerHTML = `
+        <td>${r.name || r.title || ''}</td>
+        <td>${r.probability || 0}%</td>
+        <td>${r.points || 0}</td>
+        <td>${r.active ? 'true' : 'false'}</td>
+        <td>${new Date(r.createdAt).toLocaleString()}</td>
+        <td>
+          <button class="btn btn-secondary" data-action="edit-reward" data-id="${r.id||r._id}">Edit</button>
+          <button class="btn" data-action="delete-reward" data-id="${r.id||r._id}">Delete</button>
+        </td>
+      `;
       tbody.appendChild(tr);
     });
   } catch (err) {
@@ -417,6 +473,7 @@ $('#btnShowCreateReward').addEventListener('click', () => {
   $('#createRewardMsg').textContent = '';
   $('#rTitle').value = '';
   $('#rDesc').value = '';
+  $('#rProbability').value = '0';
   $('#rPoints').value = '0';
   $('#rActive').checked = true;
   $('#createRewardDialog').showModal();
@@ -426,7 +483,13 @@ $('#createRewardForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   setMsg($('#createRewardMsg'), '');
   try {
-    const body = { title: $('#rTitle').value.trim(), description: $('#rDesc').value.trim(), points: Number($('#rPoints').value||0), active: $('#rActive').checked };
+    const body = { 
+      name: $('#rTitle').value.trim(), 
+      description: $('#rDesc').value.trim(), 
+      probability: Number($('#rProbability').value || 0),
+      points: Number($('#rPoints').value || 0), 
+      active: $('#rActive').checked 
+    };
     await api('/api/admin/rewards', { method: 'POST', body: JSON.stringify(body) });
     $('#createRewardDialog').close();
     await refreshRewards();
@@ -442,18 +505,35 @@ $('#rewardsTbody').addEventListener('click', async (e) => {
   if (!btn) return;
   const id = btn.dataset.id;
   const action = btn.dataset.action;
+  
   if (action === 'delete-reward') {
     const confirmed = await confirmDialog('Delete this reward?');
     if (!confirmed) return;
-    try { await api(`/api/admin/rewards/${id}`, { method: 'DELETE' }); await refreshRewards(); toast('Reward deleted'); } catch (err) { setMsg($('#rewardsMsg'), err.message, true); toast(err.message, true); }
+    try { 
+      await api(`/api/admin/rewards/${id}`, { method: 'DELETE' }); 
+      await refreshRewards(); 
+      toast('Reward deleted'); 
+    } catch (err) { 
+      setMsg($('#rewardsMsg'), err.message, true); 
+      toast(err.message, true); 
+    }
   }
+  
   if (action === 'edit-reward') {
     try {
       const r = await api(`/api/admin/rewards/${id}`);
-      $('#erId').value = r._id||r.id; $('#erTitle').value = r.title||''; $('#erDesc').value = r.description||''; $('#erPoints').value = r.points??0; $('#erActive').checked = !!r.active;
+      $('#erId').value = r._id||r.id; 
+      $('#erTitle').value = r.name || r.title || ''; 
+      $('#erDesc').value = r.description||''; 
+      $('#erProbability').value = r.probability || 0;
+      $('#erPoints').value = r.points || 0; 
+      $('#erActive').checked = !!r.active;
       $('#editRewardMsg').textContent='';
       $('#editRewardDialog').showModal();
-    } catch (err) { setMsg($('#rewardsMsg'), err.message, true); toast(err.message, true); }
+    } catch (err) { 
+      setMsg($('#rewardsMsg'), err.message, true); 
+      toast(err.message, true); 
+    }
   }
 });
 
@@ -462,74 +542,35 @@ $('#editRewardForm').addEventListener('submit', async (e) => {
   setMsg($('#editRewardMsg'), '');
   try {
     const id = $('#erId').value;
-    const body = { title: $('#erTitle').value.trim(), description: $('#erDesc').value.trim(), points: Number($('#erPoints').value||0), active: $('#erActive').checked };
+    const body = { 
+      name: $('#erTitle').value.trim(), 
+      description: $('#erDesc').value.trim(), 
+      probability: Number($('#erProbability').value || 0),
+      points: Number($('#erPoints').value || 0), 
+      active: $('#erActive').checked 
+    };
     await api(`/api/admin/rewards/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
     $('#editRewardDialog').close();
     await refreshRewards();
     toast('Reward updated');
-  } catch (err) { setMsg($('#editRewardMsg'), err.message, true); toast(err.message, true); }
+  } catch (err) { 
+    setMsg($('#editRewardMsg'), err.message, true); 
+    toast(err.message, true); 
+  }
 });
 
-async function confirmDialog(text) {
-  $('#confirmText').textContent = text || 'Are you sure?';
-  $('#confirmDialog').showModal();
-  return new Promise((resolve) => {
-    const ok = $('#confirmOk');
-    const handler = (e) => { $('#confirmDialog').close(); ok.removeEventListener('click', handler); resolve(e.target === ok); };
-    ok.addEventListener('click', handler, { once: true });
-    $('#confirmDialog').addEventListener('close', () => resolve(false), { once: true });
+// Dashboard nav handlers
+$all('.navbtn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    activateSection(btn.dataset.target);
+    if (btn.dataset.target === 'usersSection') await refreshUsers();
+    if (btn.dataset.target === 'feedbackSection') await refreshFeedback();
+    if (btn.dataset.target === 'shakesSection') await refreshShakes();
+    if (btn.dataset.target === 'rewardsSection') await refreshRewards();
   });
-}
+});
 
-// Theme management
-function initTheme() {
-  const THEME_KEY = 'admin_theme';
-  const themeToggle = $('#themeToggle');
-  
-  function applyTheme(mode) {
-    document.documentElement.classList.toggle('theme-light', mode === 'light');
-    document.documentElement.classList.toggle('theme-dark', mode === 'dark');
-    localStorage.setItem(THEME_KEY, mode);
-    if (themeToggle) {
-      themeToggle.checked = mode === 'dark';
-    }
-  }
-  
-  function toggleTheme() {
-    const current = localStorage.getItem(THEME_KEY) || 'light';
-    const newMode = current === 'light' ? 'dark' : 'light';
-    applyTheme(newMode);
-  }
-  
-  // Initialize theme
-  const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
-  applyTheme(savedTheme);
-  
-  // Set up event listener
-  if (themeToggle) {
-    themeToggle.addEventListener('change', toggleTheme);
-  }
-}
-
-// Enhanced section activation with theme sync
-function activateSection(id) {
-  ['usersSection','feedbackSection','shakesSection','rewardsSection','settingsSection'].forEach(sec => {
-    const node = document.getElementById(sec);
-    if (node) node.hidden = true;
-  });
-  const target = document.getElementById(id);
-  if (target) target.hidden = false;
-  
-  document.querySelectorAll('.navbtn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.target === id);
-  });
-  
-  // Sync theme toggle when settings section is opened
-  if (id === 'settingsSection') {
-    initTheme();
-  }
-}
-
+// Initialize app
 (async function init() {
   const token = getToken();
   if (token) {
@@ -538,446 +579,16 @@ function activateSection(id) {
     hide($('#authSection'));
     $('#dashboardNav').hidden = false;
     activateSection('usersSection');
-    initTheme(); // Initialize theme on app load
-    try { await refreshUsers(); } catch (err) { setMsg($('#usersMsg'), err.message, true); toast(err.message, true); }
+    initTheme();
+    try { 
+      await refreshUsers(); 
+      await refreshRewards();
+    } catch (err) { 
+      setMsg($('#usersMsg'), err.message, true); 
+      toast(err.message, true); 
+    }
   } else {
     // Not logged in; redirect to login page
     window.location.href = '/admin/login';
   }
 })();
-
-
-  const editDialog = $('#editDialog');
-  const editForm = $('#editForm');
-  const createRewardDialog = $('#createRewardDialog');
-  const createRewardForm = $('#createRewardForm');
-  const editRewardDialog = $('#editRewardDialog');
-  const editRewardForm = $('#editRewardForm');
-  const confirmDialog = $('#confirmDialog');
-  const confirmForm = $('#confirmForm');
-  const toast = $('#toast');
-
-  let state = {
-    users: [],
-    rewards: [],
-    userToDelete: null,
-    rewardToDelete: null,
-    userToEdit: null,
-    rewardToEdit: null,
-    pagination: { page: 1, limit: 10, total: 0, pages: 1 },
-    filters: { search: '', sort: 'createdAt', order: 'desc' },
-  };
-
-  function showToast(message, type = 'success') {
-    $('#toast').textContent = message || '';
-    $('#toast').className = `toast${isErr ? ' error' : ''}`;
-    requestAnimationFrame(() => t.classList.add('show'));
-    setTimeout(() => t.classList.remove('show'), 3000);
-  }
-
-  function render() {
-    renderUsers();
-    renderPagination();
-    renderRewards();
-  }
-
-  function renderUsers() {
-    $('#usersTableBody').innerHTML = state.users.map(userRow).join('');
-  }
-
-  function renderRewards() {
-    const rewardRow = (reward) => `
-      <tr>
-        <td>${escapeHTML(reward.name)}</td>
-        <td>${reward.probability}%</td>
-        <td><img src="${escapeHTML(reward.imageUrl || '')}" alt="${escapeHTML(reward.name)}" style="width: 50px; height: 50px; object-fit: cover;"></td>
-        <td>
-          <button class="btn-icon edit-reward" data-id="${reward._id}" title="Edit"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
-          <button class="btn-icon delete-reward" data-id="${reward._id}" title="Delete"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></button>
-        </td>
-      </tr>
-    `;
-    $('#rewardsTableBody').innerHTML = state.rewards.map(rewardRow).join('');
-  }
-
-  async function fetchUsers() {
-    try {
-      state.users = await api('/api/admin/users');
-      render();
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  }
-
-  async function fetchRewards() {
-    try {
-      state.rewards = await api('/api/rewards');
-      render();
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  }
-
-  function handleAddClick() {
-    $('#createDialog').showModal();
-  }
-
-  function handleAddRewardClick() {
-    createRewardForm.reset();
-    createRewardDialog.showModal();
-  }
-
-  async function handleCreateForm(e) {
-    e.preventDefault();
-    const name = $('#cName').value;
-    const email = $('#cEmail').value;
-    const password = $('#cPassword').value;
-    const role = $('#cRole').value;
-    await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ name, email, password, role }) });
-    $('#createDialog').close();
-    await fetchUsers();
-    showToast('User created successfully');
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
-  }
-
-  async function handleCreateRewardForm(e) {
-    e.preventDefault();
-    const name = $('#createRewardName').value;
-    const description = $('#createRewardDescription').value;
-    const imageUrl = $('#createRewardImageUrl').value;
-    const probability = parseFloat($('#createRewardProbability').value);
-
-    try {
-      await api('/api/rewards', {
-        method: 'POST',
-        body: JSON.stringify({ name, description, imageUrl, probability }),
-      });
-      createRewardDialog.close();
-      await fetchRewards();
-      showToast('Reward created successfully');
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  }
-
-  function handleTableClick(e) {
-    if (e.target.closest('.delete-user')) {
-      const id = e.target.closest('.delete-user').dataset.id;
-      state.userToDelete = id;
-      $('#confirmDialog .dialog-form h2').textContent = 'Delete User';
-      $('#confirmDialog .dialog-form p').textContent = 'Are you sure you want to delete this user? This action cannot be undone.';
-      confirmDialog.showModal();
-    } else if (e.target.closest('.edit-user')) {
-      const id = e.target.closest('.edit-user').dataset.id;
-      state.userToEdit = state.users.find(u => u._id === id);
-      if (state.userToEdit) {
-        $('#editUserId').value = state.userToEdit._id;
-        $('#editName').value = state.userToEdit.name;
-        $('#editEmail').value = state.userToEdit.email;
-        $('#editRole').value = state.userToEdit.role;
-        $('#editActive').checked = state.userToEdit.active;
-        editDialog.showModal();
-      }
-    } else if (e.target.closest('.delete-reward')) {
-      const id = e.target.closest('.delete-reward').dataset.id;
-      state.rewardToDelete = id;
-      $('#confirmDialog .dialog-form h2').textContent = 'Delete Reward';
-      $('#confirmDialog .dialog-form p').textContent = 'Are you sure you want to delete this reward?';
-      confirmDialog.showModal();
-    } else if (e.target.closest('.edit-reward')) {
-      const id = e.target.closest('.edit-reward').dataset.id;
-      state.rewardToEdit = state.rewards.find(r => r._id === id);
-      if (state.rewardToEdit) {
-        $('#editRewardId').value = state.rewardToEdit._id;
-        $('#editRewardName').value = state.rewardToEdit.name;
-        $('#editRewardDescription').value = state.rewardToEdit.description;
-        $('#editRewardImageUrl').value = state.rewardToEdit.imageUrl;
-        $('#editRewardProbability').value = state.rewardToEdit.probability;
-        editRewardDialog.showModal();
-      }
-    }
-  }
-
-  async function handleEditForm(e) {
-    e.preventDefault();
-    const id = $('#eId').value;
-    const name = $('#eName').value;
-    const email = $('#eEmail').value;
-    const role = $('#eRole').value;
-    const active = $('#eActive').value === 'true',
-    await api(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
-    $('#editDialog').close();
-    await refreshUsers();
-    showToast('User updated successfully');
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
-  }
-
-  async function handleEditRewardForm(e) {
-    e.preventDefault();
-    const id = $('#editRewardId').value;
-    const name = $('#editRewardName').value;
-    const description = $('#editRewardDescription').value;
-    const imageUrl = $('#editRewardImageUrl').value;
-    const probability = parseFloat($('#editRewardProbability').value);
-
-    try {
-      await api(`/api/rewards/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ name, description, imageUrl, probability }),
-      });
-      editRewardDialog.close();
-      await fetchRewards();
-      showToast('Reward updated successfully');
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  }
-
-  async function handleConfirmForm(e) {
-    e.preventDefault();
-    if (state.userToDelete) {
-      try {
-        await api(`/api/admin/users/${state.userToDelete}`, { method: 'DELETE' });
-        confirmDialog.close();
-        await fetchUsers();
-        showToast('User deleted successfully');
-      } catch (err) {
-        showToast(err.message, 'error');
-      } finally {
-        state.userToDelete = null;
-      }
-    } else if (state.rewardToDelete) {
-      try {
-        await api(`/api/rewards/${state.rewardToDelete}`, { method: 'DELETE' });
-        confirmDialog.close();
-        await fetchRewards();
-        showToast('Reward deleted successfully');
-      } catch (err) {
-        showToast(err.message, 'error');
-      } finally {
-        state.rewardToDelete = null;
-      }
-    }
-  }
-
-  function handleSearch(e) {
-    fetchUsers();
-  }
-
-  function init() {
-    // Nav
-    $('#usersTableBody').addEventListener('click', handleTableClick);
-    $('#rewardsTableBody').addEventListener('click', handleTableClick);
-
-    // Filters
-    $('#searchInput').addEventListener('input', debounce(handleSearch, 300));
-
-    // Initial data fetch
-    fetchUsers();
-    fetchRewards();
-  }
-
-  init();
-})();
-
-
-function debounce(fn, ms=300) {
-  let t;
-  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-}
-
-function escapeHTML(str) {
-  const p = document.createElement('p');
-  p.appendChild(document.createTextNode(str));
-  return p.innerHTML;
-}
-
-// Logout
-$('#btnLogout').addEventListener('click', () => {
-  $('#deleteDialog').showModal();
-  $('#deleteDialog').dataset.id = id;
-  $('#deleteDialog').dataset.type = 'user';
-});
-
-$('#usersTbody').addEventListener('click', async (e) => {
-  const target = e.target;
-  const action = target.dataset.action;
-  const id = target.dataset.id;
-
-  if (action === 'edit') {
-    try {
-      const user = await api(`/api/admin/users/${id}`);
-      $('#editUserId').value = user._id;
-      $('#editName').value = user.name;
-      $('#editEmail').value = user.email;
-      $('#editRole').value = user.role;
-      $('#editActive').checked = user.active;
-      $('#editUserDialog').showModal();
-    } catch (err) {
-      toast(err.message, true);
-    }
-  } else if (action === 'delete') {
-    $('#deleteDialog').showModal();
-    $('#deleteDialog').dataset.id = id;
-    $('#deleteDialog').dataset.type = 'user';
-  }
-});
-
-$('#rewardsTbody').addEventListener('click', async (e) => {
-  const target = e.target;
-  const action = target.dataset.action;
-  const id = target.dataset.id;
-
-  if (action === 'edit-reward') {
-    try {
-      const reward = await api(`/api/rewards/${id}`);
-      $('#editRewardId').value = reward._id;
-      $('#editRewardName').value = reward.name;
-      $('#editRewardDescription').value = reward.description;
-      $('#editRewardImageUrl').value = reward.imageUrl;
-      $('#editRewardProbability').value = reward.probability;
-      $('#editRewardDialog').showModal();
-    } catch (err) {
-      toast(err.message, true);
-    }
-  } else if (action === 'delete-reward') {
-    $('#deleteDialog').showModal();
-    $('#deleteDialog').dataset.id = id;
-    $('#deleteDialog').dataset.type = 'reward';
-  }
-});
-
-$('#addUserBtn').addEventListener('click', () => {
-  $('#addUserDialog').showModal();
-});
-
-$('#addRewardBtn').addEventListener('click', () => {
-  $('#addRewardDialog').showModal();
-});
-
-$('#addUserForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const name = $('#addName').value;
-  const email = $('#addEmail').value;
-  const password = $('#addPassword').value;
-  const role = $('#addRole').value;
-  try {
-    await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ name, email, password, role }) });
-    $('#addUserDialog').close();
-    await refreshUsers();
-    toast('User created successfully');
-  } catch (err) {
-    toast(err.message, true);
-  }
-});
-
-$('#addRewardForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const name = $('#addRewardName').value;
-  const description = $('#addRewardDescription').value;
-  const imageUrl = $('#addRewardImageUrl').value;
-  const probability = parseFloat($('#addRewardProbability').value);
-  try {
-    await api('/api/rewards', { method: 'POST', body: JSON.stringify({ name, description, imageUrl, probability }) });
-    $('#addRewardDialog').close();
-    await refreshRewards();
-    toast('Reward created successfully');
-  } catch (err) {
-    toast(err.message, true);
-  }
-});
-
-$('#editUserForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const id = $('#editUserId').value;
-  const name = $('#editName').value;
-  const email = $('#editEmail').value;
-  const role = $('#editRole').value;
-  const active = $('#editActive').checked;
-  try {
-    await api(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify({ name, email, role, active }) });
-    $('#editUserDialog').close();
-    await refreshUsers();
-    toast('User updated successfully');
-  } catch (err) {
-    toast(err.message, true);
-  }
-});
-
-$('#editRewardForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const id = $('#editRewardId').value;
-  const name = $('#editRewardName').value;
-  const description = $('#editRewardDescription').value;
-  const imageUrl = $('#editRewardImageUrl').value;
-  const probability = parseFloat($('#editRewardProbability').value);
-  try {
-    await api(`/api/rewards/${id}`, { method: 'PUT', body: JSON.stringify({ name, description, imageUrl, probability }) });
-    $('#editRewardDialog').close();
-    await refreshRewards();
-    toast('Reward updated successfully');
-  } catch (err) {
-    toast(err.message, true);
-  }
-});
-
-$('#deleteForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const id = $('#deleteDialog').dataset.id;
-  const type = $('#deleteDialog').dataset.type;
-  try {
-    if (type === 'user') {
-      await api(`/api/admin/users/${id}`, { method: 'DELETE' });
-      await refreshUsers();
-      toast('User deleted successfully');
-    } else if (type === 'reward') {
-      await api(`/api/rewards/${id}`, { method: 'DELETE' });
-      await refreshRewards();
-      toast('Reward deleted successfully');
-    }
-    $('#deleteDialog').close();
-  } catch (err) {
-    toast(err.message, true);
-  }
-});
-
-
-// Search and filter handlers
-const debouncedRefresh = debounce(refreshUsers, 300);
-$('#searchInput').addEventListener('input', debouncedRefresh);
-$('#limit').addEventListener('change', () => { state.page = 1; refreshUsers(); });
-$('#sortField').addEventListener('change', refreshUsers);
-$('#sortOrder').addEventListener('change', refreshUsers);
-$('#prevPage').addEventListener('click', () => { if (state.page > 1) { state.page--; refreshUsers(); } });
-$('#nextPage').addEventListener('click', () => { state.page++; refreshUsers(); });
-
-
-async function init() {
-  setAuth(getToken());
-  const user = await ensureUserLoaded();
-  if (!user) {
-    window.location.href = '/admin/login';
-    return;
-  }
-  if (user.role !== 'admin') {
-    alert('Access denied. You must be an admin to view this page.');
-    window.location.href = '/admin/login';
-    return;
-  }
-
-  $('#dashboardNav').hidden = false;
-  activateSection('usersSection');
-  await refreshUsers();
-  await refreshRewards();
-}
-
-init().catch(err => {
-  console.error('Init failed', err);
-  toast(err.message, true);
-  setAuth(null);
-  // window.location.href = '/admin/login';
-});

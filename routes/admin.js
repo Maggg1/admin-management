@@ -241,13 +241,16 @@ router.get('/activities', async (req, res) => {
     if (type) {
       query.type = type;
     }
-    const activities = await Activity.find(query)
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit));
+
+    let activityQuery = Activity.find(query).populate('user', 'name email').sort({ createdAt: -1 });
+    if (limit) {
+      activityQuery = activityQuery.limit(parseInt(limit, 10));
+    }
+
+    const activities = await activityQuery;
     res.json(activities);
-  } catch (err) {
-    console.error('get activities error:', err);
-    res.status(500).json({ message: 'Server error' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching activities', error: error.message });
   }
 });
 
@@ -268,7 +271,7 @@ router.post('/activities', async (req, res) => {
 });
 
 // POST /admin/shakes
-router.post('/shakes', authorize('admin'), async (req, res) => {
+router.post('/shakes', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { userId, amount } = req.body;
     const activity = new Activity({
@@ -284,38 +287,7 @@ router.post('/shakes', authorize('admin'), async (req, res) => {
 });
 
 // GET /admin/shakes
-router.get('/shakes', authorize('admin'), async (req, res) => {
-  try {
-    const shakes = await Activity.find({ type: 'shake' }).populate('user', 'name email');
-    res.json(shakes);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching shakes', error: error.message });
-  }
-});
-
-// GET /admin/activities
-router.get('/activities', async (req, res) => {
-  try {
-    const { type, limit } = req.query;
-    const query = {};
-    if (type) {
-      query.type = type;
-    }
-
-    let activityQuery = Activity.find(query).populate('user', 'name email').sort({ createdAt: -1 });
-    if (limit) {
-      activityQuery = activityQuery.limit(parseInt(limit, 10));
-    }
-
-    const activities = await activityQuery;
-    res.json(activities);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching activities', error: error.message });
-  }
-});
-
-// GET /admin/shakes
-router.get('/shakes', async (req, res) => {
+router.get('/shakes', authenticate, authorize('admin'), async (req, res) => {
   try {
     const shakes = await Activity.find({ type: 'shake' }).populate('user', 'name email').sort({ createdAt: -1 });
     res.json(shakes);
@@ -375,47 +347,57 @@ const getFeedbacksHandler = [
   },
 ];
 
+// Debug endpoint to check user authentication
+router.get('/debug-user', authenticate, (req, res) => {
+  console.log('User object:', req.user);
+  console.log('User role:', req.user?.role);
+  res.json({ user: req.user, role: req.user?.role });
+});
+
 router.get('/feedbacks', getFeedbacksHandler);
 router.get('/feedback', getFeedbacksHandler);
 
-// Rewards CRUD
-// POST /api/admin/rewards - create a reward
+// --- Rewards ---
+
+// GET /api/admin/rewards
+router.get('/rewards', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const rewards = await Reward.find().sort({ createdAt: -1 });
+    res.json(rewards);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching rewards', error: error.message });
+  }
+});
+
+// POST /api/admin/rewards
 router.post(
   '/rewards',
+  authenticate,
+  authorize('admin'),
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
-    body('points').isInt({ min: 0 }).withMessage('Points must be a non-negative integer'),
-    body('description').optional().isString().trim(),
-    body('active').optional().isBoolean(),
+    body('description').trim().notEmpty().withMessage('Description is required'),
+    body('probability').isFloat({ min: 0, max: 100 }).withMessage('Probability must be between 0 and 100'),
+    body('points').optional().isInt({ min: 0 }).withMessage('Points must be a non-negative integer'),
   ],
   handleValidation,
   async (req, res) => {
     try {
-      const { name, description, points, active } = req.body;
-      const reward = new Reward({ name, description, points, active });
+      const { name, description, probability, points } = req.body;
+      const reward = new Reward({ name, description, probability, points });
       await reward.save();
       res.status(201).json(reward);
-    } catch (err) {
-      console.error('create reward error:', err);
-      res.status(500).json({ message: 'Internal server error' });
+    } catch (error) {
+      res.status(400).json({ message: 'Error creating reward', error: error.message });
     }
   }
 );
 
-// GET /api/admin/rewards - list rewards
-router.get('/rewards', async (req, res) => {
-  try {
-    const rewards = await Reward.find({}).sort({ createdAt: -1 });
-    res.json(rewards);
-  } catch (err) {
-    console.error('list rewards error:', err);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-});
-
-// GET /api/admin/rewards/:id - get reward by ID
+// GET /api/admin/rewards/:id
 router.get(
   '/rewards/:id',
+  authenticate,
+  authorize('admin'),
   [param('id').custom((v) => mongoose.Types.ObjectId.isValid(v)).withMessage('Invalid ID')],
   handleValidation,
   async (req, res) => {
@@ -423,22 +405,23 @@ router.get(
       const reward = await Reward.findById(req.params.id);
       if (!reward) return res.status(404).json({ message: 'Reward not found' });
       res.json(reward);
-    } catch (err) {
-      console.error('get reward error:', err);
-      res.status(500).json({ message: 'Internal server error' });
+    } catch (error) {
+      res.status(500).json({ message: 'Error fetching reward', error: error.message });
     }
   }
 );
 
-// PATCH /api/admin/rewards/:id - update a reward
+// PATCH /api/admin/rewards/:id
 router.patch(
   '/rewards/:id',
+  authenticate,
+  authorize('admin'),
   [
     param('id').custom((v) => mongoose.Types.ObjectId.isValid(v)).withMessage('Invalid ID'),
     body('name').optional().trim().notEmpty().withMessage('Name is required'),
+    body('description').optional().trim().notEmpty().withMessage('Description is required'),
+    body('probability').optional().isFloat({ min: 0, max: 100 }).withMessage('Probability must be between 0 and 100'),
     body('points').optional().isInt({ min: 0 }).withMessage('Points must be a non-negative integer'),
-    body('description').optional().isString().trim(),
-    body('active').optional().isBoolean(),
   ],
   handleValidation,
   async (req, res) => {
@@ -446,36 +429,37 @@ router.patch(
       const reward = await Reward.findById(req.params.id);
       if (!reward) return res.status(404).json({ message: 'Reward not found' });
 
-      const { name, description, points, active } = req.body;
+      const { name, description, probability, points } = req.body;
       if (name) reward.name = name;
       if (description) reward.description = description;
+      if (probability !== undefined) reward.probability = probability;
       if (points !== undefined) reward.points = points;
-      if (active !== undefined) reward.active = active;
 
       await reward.save();
       res.json(reward);
-    } catch (err) {
-      console.error('update reward error:', err);
-      res.status(500).json({ message: 'Internal server error' });
+    } catch (error) {
+      res.status(400).json({ message: 'Error updating reward', error: error.message });
     }
   }
 );
 
-// DELETE /api/admin/rewards/:id - delete a reward
+// DELETE /api/admin/rewards/:id
 router.delete(
   '/rewards/:id',
+  authenticate,
+  authorize('admin'),
   [param('id').custom((v) => mongoose.Types.ObjectId.isValid(v)).withMessage('Invalid ID')],
   handleValidation,
   async (req, res) => {
     try {
       const reward = await Reward.findByIdAndDelete(req.params.id);
       if (!reward) return res.status(404).json({ message: 'Reward not found' });
-      res.json({ success: true, message: 'Reward deleted' });
-    } catch (err) {
-      console.error('delete reward error:', err);
-      res.status(500).json({ message: 'Internal server error' });
+      res.json({ message: 'Reward deleted successfully' });
+    } catch (error) {
+      res.status(500).json({ message: 'Error deleting reward', error: error.message });
     }
   }
 );
+
 
 module.exports = router;

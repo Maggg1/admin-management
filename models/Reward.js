@@ -21,11 +21,16 @@ const rewardSchema = new mongoose.Schema({
     min: 0,
     max: 100,
   },
-  createdAt: {
-    type: Date,
-    default: Date.now,
+  points: {
+    type: Number,
+    default: 0,
+    min: 0,
   },
-});
+  active: {
+    type: Boolean,
+    default: true,
+  },
+}, { timestamps: true });
 
 const Reward = mongoose.model('Reward', rewardSchema);
 
