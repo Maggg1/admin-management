@@ -287,14 +287,40 @@ router.post('/shakes', authenticate, authorize('admin'), async (req, res) => {
 });
 
 // GET /admin/shakes
-router.get('/shakes', authenticate, authorize('admin'), async (req, res) => {
-  try {
-    const shakes = await Activity.find({ type: 'shake' }).populate('user', 'name email').sort({ createdAt: -1 });
-    res.json(shakes);
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching shakes', error: error.message });
+router.get(
+  '/shakes',
+  authenticate,
+  authorize('admin'),
+  [
+    query('page').optional().isInt({ min: 1 }).toInt(),
+    query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+  ],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const page = req.query.page || 1;
+      const limit = req.query.limit || 10;
+
+      const total = await Activity.countDocuments({ type: 'shake' });
+      const shakes = await Activity.find({ type: 'shake' })
+        .populate('user', 'name email')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean();
+
+      res.json({
+        data: shakes,
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      });
+    } catch (error) {
+      res.status(500).json({ message: 'Error fetching shakes', error: error.message });
+    }
   }
-});
+);
 
 // GET /admin/feedbacks
 const getFeedbacksHandler = [

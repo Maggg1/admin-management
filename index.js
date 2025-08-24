@@ -18,10 +18,13 @@ const handleValidation = require('./utils/validation');
 
 // Import routes
 const authRoutes = require('./routes/auth');
+const userAuthRoutes = require('./routes/userAuth');
 const adminAuthRoutes = require('./routes/adminAuth');
 const adminRoutes = require('./routes/admin');
 const userRoutes = require('./routes/users');
 const rewardRoutes = require('./routes/rewards');
+const activityRoutes = require('./routes/activities');
+const feedbackRoutes = require('./routes/feedbacks');
 
 const app = express();
 
@@ -182,14 +185,16 @@ app.get('/favicon.ico', (req, res) =>
 
 // Mount routers
 app.use('/api/auth', authRoutes);
+app.use('/api/user/auth', userAuthRoutes);
 app.use('/api/admin/auth', adminAuthRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/rewards', rewardRoutes);
+app.use('/api/activities', activityRoutes);
+app.use('/api/feedbacks', feedbackRoutes);
 
 // Serve Admin UI static files
 app.use('/admin', express.static(path.join(__dirname, 'public', 'admin')));
-app.use('/api/rewards', rewardRoutes);
 
 // Error handling middleware
 app.use(errorHandler);
