@@ -50,7 +50,7 @@ app.use('*', (req, res) => {
 });
 
 const PORT = process.env.USER_API_PORT || 4001;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/admin-backend';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://addenasang:abcd1234@ac-ixwwvqn-shard-00-00.9wlmev7.mongodb.net:27017,ac-ixwwvqn-shard-00-01.9wlmev7.mongodb.net:27017,ac-ixwwvqn-shard-00-02.9wlmev7.mongodb.net:27017/admin_backend?ssl=true&replicaSet=atlas-ixwwvqn-shard-0&authSource=admin&retryWrites=true&w=majority';
 
 mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,

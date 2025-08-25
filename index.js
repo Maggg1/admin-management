@@ -29,8 +29,8 @@ const feedbackRoutes = require('./routes/feedbacks');
 const app = express();
 
 // Configuration
-// const PORT = process.env.PORT || 4000;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017';
+// Port configuration moved to server initialization section
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/admin-backend';
 const DB_NAME = process.env.DB_NAME || 'admin_backend';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
@@ -151,7 +151,7 @@ app.get('/ready', (req, res) => {
 // MongoDB connection with retry
 async function connectWithRetry(retries = 0) {
   try {
-    await mongoose.connect(MONGO_URI, {
+    await mongoose.connect(MONGODB_URI, {
     serverSelectionTimeoutMS: MONGO_TIMEOUT_MS,
     connectTimeoutMS: MONGO_TIMEOUT_MS,
     socketTimeoutMS: 20000,

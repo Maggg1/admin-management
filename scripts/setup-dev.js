@@ -42,7 +42,7 @@ async function setupEnvironment() {
   log('\n👤 Creating test admin user...', colors.blue);
   try {
     require('dotenv').config();
-    const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017';
+    const MONGO_URI = process.env.MONGO_URI || 'mongodb://addenasang:abcd1234@ac-ixwwvqn-shard-00-00.9wlmev7.mongodb.net:27017,ac-ixwwvqn-shard-00-01.9wlmev7.mongodb.net:27017,ac-ixwwvqn-shard-00-02.9wlmev7.mongodb.net:27017/admin_backend?ssl=true&replicaSet=atlas-ixwwvqn-shard-0&authSource=admin&retryWrites=true&w=majority';
     const DB_NAME = process.env.DB_NAME || 'admin_backend';
     
     await mongoose.connect(MONGO_URI, { dbName: DB_NAME });

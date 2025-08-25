@@ -88,7 +88,7 @@ async function testRetryUtility() {
 async function testMongoRetry() {
   console.log('\n🧪 Testing MongoDB connection retry...');
   
-  const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/test';
+  const MONGO_URI = process.env.MONGO_URI || 'mongodb://addenasang:abcd1234@ac-ixwwvqn-shard-00-00.9wlmev7.mongodb.net:27017,ac-ixwwvqn-shard-00-01.9wlmev7.mongodb.net:27017,ac-ixwwvqn-shard-00-02.9wlmev7.mongodb.net:27017/admin_backend?ssl=true&replicaSet=atlas-ixwwvqn-shard-0&authSource=admin&retryWrites=true&w=majority';
   
   try {
     await mongoose.connect(MONGO_URI, {

@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const app = express();
 
 // Use local MongoDB for testing
-const MONGODB_URI = 'mongodb://localhost:27017/admin-backend-test';
+const MONGODB_URI = 'mongodb://addenasang:abcd1234@ac-ixwwvqn-shard-00-00.9wlmev7.mongodb.net:27017,ac-ixwwvqn-shard-00-01.9wlmev7.mongodb.net:27017,ac-ixwwvqn-shard-00-02.9wlmev7.mongodb.net:27017/admin_backend?ssl=true&replicaSet=atlas-ixwwvqn-shard-0&authSource=admin&retryWrites=true&w=majority';
 
 console.log('🔧 Testing unified backend with local MongoDB...');
 
