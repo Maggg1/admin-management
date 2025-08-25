@@ -18,8 +18,6 @@ const handleValidation = require('./utils/validation');
 
 // Import routes
 const authRoutes = require('./routes/auth');
-const userAuthRoutes = require('./routes/userAuth');
-const adminAuthRoutes = require('./routes/adminAuth');
 const adminRoutes = require('./routes/admin');
 const userRoutes = require('./routes/users');
 const rewardRoutes = require('./routes/rewards');
@@ -29,8 +27,8 @@ const feedbackRoutes = require('./routes/feedbacks');
 const app = express();
 
 // Configuration
-// Port configuration moved to server initialization section
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/admin-backend';
+// const PORT = process.env.PORT || 4000;
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017';
 const DB_NAME = process.env.DB_NAME || 'admin_backend';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
@@ -135,6 +133,10 @@ app.use(sanitizeInput);
 app.use(morgan('dev'));
 
 // Static admin client
+app.use('/admin', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
 app.use('/admin', express.static('public/admin'));
 
 // Health check endpoints (no CORS restrictions)
@@ -185,8 +187,6 @@ app.get('/favicon.ico', (req, res) =>
 
 // Mount routers
 app.use('/api/auth', authRoutes);
-app.use('/api/user/auth', userAuthRoutes);
-app.use('/api/admin/auth', adminAuthRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/rewards', rewardRoutes);
@@ -200,7 +200,7 @@ app.use('/admin', express.static(path.join(__dirname, 'public', 'admin')));
 app.use(errorHandler);
 
 // Start the server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

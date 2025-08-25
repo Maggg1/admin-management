@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Admin Login</title>
   <style>
     :root{
@@ -133,22 +136,51 @@
       try{
         const email = $('#loginEmail').value.trim();
         const password = $('#loginPassword').value;
-        const { token } = await api('/api/admin/auth/login', { method:'POST', body: JSON.stringify({ email, password }) });
+        const { token } = await api('/api/auth/login', { method:'POST', body: JSON.stringify({ email, password }) });
         localStorage.setItem(STORAGE_KEY, token);
         location.href = '/admin/';
       }catch(err){ $('#loginMsg').textContent = err.message; $('#loginMsg').className='msg error'; }
     });
 
-    $('#registerForm').addEventListener('submit', async (e)=>{
-      e.preventDefault(); $('#registerMsg').textContent='';
-      try{
-        const name = $('#registerName').value.trim();
-        const email = $('#registerEmail').value.trim();
-        const password = $('#registerPassword').value;
-        const { token } = await api('/api/auth/register-admin', { method:'POST', body: JSON.stringify({ name, email, password }) });
-        localStorage.setItem(STORAGE_KEY, token);
+    $('#registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('#registerMsg').textContent = '';
+      const name = $('#registerName').value.trim();
+      const email = $('#registerEmail').value.trim();
+      const password = $('#registerPassword').value;
+      const userData = { name, email, password };
+
+      try {
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(userData)
+        });
+
+        const data = await response.json();
+
+        if (response.status === 409) {
+          // User already exists
+          alert('User already exists. Please login instead.');
+          // You can switch tabs here
+          const loginTab = $('[data-tab="loginTab"]');
+          if(loginTab) loginTab.click();
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Registration failed');
+        }
+
+        // Registration successful
+        console.log('Registration successful:', data);
+        localStorage.setItem(STORAGE_KEY, data.token);
         location.href = '/admin/';
-      }catch(err){ $('#registerMsg').textContent = err.message; $('#registerMsg').className='msg error'; }
+      } catch (error) {
+        console.error('Registration error:', error.message);
+        $('#registerMsg').textContent = error.message;
+        $('#registerMsg').className = 'msg error';
+      }
     });
   </script>
 </body>

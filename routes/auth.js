@@ -34,6 +34,16 @@ router.post(
       }
 
       const { name, email, password } = req.body;
+      
+      // Check if user already exists
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(409).json({ 
+          message: 'Email already in use',
+          code: 'USER_EXISTS'
+        });
+      }
+
       const user = new User({ name, email, password, role: 'admin', emailVerified: true });
       await user.save();
 
@@ -48,7 +58,10 @@ router.post(
       return res.status(201).json({ token, user: safeUser });
     } catch (err) {
       if (err?.code === 11000) {
-        return res.status(409).json({ message: 'Email already in use' });
+        return res.status(409).json({ 
+          message: 'Email already in use',
+          code: 'DUPLICATE_EMAIL'
+        });
       }
       console.error('register-admin error:', err);
       return res.status(500).json({ message: 'Internal server error' });
@@ -56,6 +69,7 @@ router.post(
   }
 );
 
+// Fixed register endpoint - only for registration
 router.post(
   '/register',
   [
@@ -66,57 +80,87 @@ router.post(
   handleValidation,
   async (req, res) => {
     try {
-      // **DISABLE NORMAL USER REGISTRATION** - Admin-only system
-      return res.status(403).json({ 
-        message: 'User registration is disabled. Only admin users can be created by existing admins.',
-        debug: process.env.NODE_ENV === 'development' ? 'Admin-only system' : undefined
+      const { name, email, password } = req.body;
+      
+      // Check if user already exists first
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(409).json({ 
+          message: 'User with this email already exists. Please login instead.',
+          code: 'USER_EXISTS'
+        });
+      }
+
+      // Create new user
+      const user = new User({
+        name,
+        email,
+        password,
+        role: 'user',
+        emailVerified: false,
+      });
+      
+      await user.save();
+
+      const token = signToken(user);
+      const safeUser = {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        active: user.active,
+      };
+
+      return res.status(201).json({ 
+        message: 'User registered successfully',
+        token, 
+        user: safeUser 
       });
     } catch (err) {
-      console.error('register error:', err);
+      if (err?.code === 11000) {
+        return res.status(409).json({ 
+          message: 'Email already in use',
+          code: 'DUPLICATE_EMAIL'
+        });
+      }
+      console.error('User registration error:', err);
       return res.status(500).json({ message: 'Internal server error' });
     }
   }
 );
 
+// Separate login endpoint
 router.post(
   '/login',
   [
-    body('email').isEmail().withMessage('Valid email required'),
+    body('email').isEmail().withMessage('Valid email required').normalizeEmail(),
     body('password').notEmpty().withMessage('Password required'),
   ],
   handleValidation,
   async (req, res) => {
     try {
       const { email, password } = req.body;
-      
-      // Enhanced logging for debugging
-      console.log(`🔐 Admin login attempt for email: ${email}`);
-      
       const user = await User.findOne({ email }).select('+password');
-      if (!user || user.role === 'admin') {
-        console.log(`❌ User login failed: User not found or is an admin for email: ${email}`);
+
+      if (!user) {
         return res.status(401).json({ 
           message: 'Invalid credentials',
-          debug: process.env.NODE_ENV === 'development' ? 'User not found or is an admin' : undefined
+          code: 'INVALID_CREDENTIALS'
         });
       }
-      
+
       if (!user.active) {
-        console.log(`❌ Admin login failed: User account disabled for email: ${email}`);
         return res.status(403).json({ 
-          message: 'User is disabled',
-          debug: process.env.NODE_ENV === 'development' ? 'Account inactive' : undefined
+          message: 'Account is disabled. Please contact support.',
+          code: 'ACCOUNT_DISABLED'
         });
       }
-
-
 
       const match = await user.comparePassword(password);
       if (!match) {
-        console.log(`❌ Admin login failed: Invalid password for email: ${email}`);
         return res.status(401).json({ 
           message: 'Invalid credentials',
-          debug: process.env.NODE_ENV === 'development' ? 'Password mismatch' : undefined
+          code: 'INVALID_CREDENTIALS'
         });
       }
 
@@ -129,14 +173,37 @@ router.post(
         active: user.active,
       };
       
-      console.log(`✅ Admin login successful for email: ${email}`);
-      return res.json({ token, user: safeUser });
-    } catch (err) {
-      console.error('🔥 Admin login error:', err);
-      return res.status(500).json({ 
-        message: 'Internal server error',
-        debug: process.env.NODE_ENV === 'development' ? err.message : undefined
+      return res.json({ 
+        message: 'Login successful',
+        token, 
+        user: safeUser 
       });
+    } catch (err) {
+      console.error('Login error:', err);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
+// Optional: Check if user exists endpoint
+router.post(
+  '/check-user',
+  [
+    body('email').isEmail().withMessage('Valid email required').normalizeEmail(),
+  ],
+  handleValidation,
+  async (req, res) => {
+    try {
+      const { email } = req.body;
+      const user = await User.findOne({ email }).select('email');
+      
+      return res.json({ 
+        exists: !!user,
+        email: email
+      });
+    } catch (err) {
+      console.error('Check user error:', err);
+      return res.status(500).json({ message: 'Internal server error' });
     }
   }
 );
