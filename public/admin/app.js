@@ -1,6 +1,6 @@
 'use strict';
 
-const API_BASE = '';
+const API_BASE = 'http://localhost:4000';
 const STORAGE_KEY = 'admin_backend_token';
 const USER_KEY = 'admin_backend_user';
 
@@ -173,7 +173,7 @@ $('#loginForm').addEventListener('submit', async (e) => {
   try {
     const email = $('#loginEmail').value.trim();
     const password = $('#loginPassword').value;
-    const { token, user } = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+const { token, user } = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
     setAuth(token, user);
     hide($('#authSection'));
     $('#dashboardNav').hidden = false;

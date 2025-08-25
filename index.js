@@ -89,17 +89,17 @@ function isAllowedOrigin(origin) {
     return allowedList.some((a) => matchesAllowed(origin, a));
   }
 
-  try {
-    const u = new URL(origin);
-    const expoPorts = new Set(['19000', '19001', '19002', '19006']);
-    const isLocalHost = (hn) =>
-      hn === 'localhost' || hn === '127.0.0.1' ||
-      /^192\.(168|0)\./.test(hn) || /^10\./.test(hn);
+    try {
+      const u = new URL(origin);
+      const expoPorts = new Set(['19000', '19001', '19002', '19006']);
+      const isLocalHost = (hn) =>
+        hn === 'localhost' || hn === '127.0.0.1' ||
+        /^192\.(168|0)\./.test(hn) || /^10\./.test(hn);
 
-    if (isLocalHost(u.hostname) && (expoPorts.has(u.port) || u.port === '3000' || u.port === '5173')) {
-      return true;
-    }
-  } catch (_) {}
+      if (isLocalHost(u.hostname) && (expoPorts.has(u.port) || u.port === '3000' || u.port === '5173' || u.port === '8082')) {
+        return true;
+      }
+    } catch (_) {}
 
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\\d+)?$/.test(origin)) return true;
   return false;
